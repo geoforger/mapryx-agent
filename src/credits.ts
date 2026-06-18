@@ -1,10 +1,90 @@
-const MODEL_NEURON_RATES: Record<string, { input: number; output: number }> = {
-  "@cf/zai-org/glm-4.7-flash": { input: 0.01, output: 0.04 },
+type BillingConfig = {
+  workersUsdPer1000Neurons: number;
+  planPriceUsd: number;
+  includedCredits: number;
+  targetGrossMargin: number;
 };
 
-const NEURONS_PER_CREDIT = 1000;
+type ModelTokenPricing = {
+  inputUsdPerMillionTokens: number;
+  outputUsdPerMillionTokens: number;
+};
+
+const DEFAULT_BILLING_CONFIG: BillingConfig = {
+  workersUsdPer1000Neurons: 0.011,
+  planPriceUsd: 10,
+  includedCredits: 1000,
+  targetGrossMargin: 0.7
+};
+
+const MODEL_TOKEN_PRICING: Record<string, ModelTokenPricing> = {
+  "@cf/zai-org/glm-4.7-flash": {
+    inputUsdPerMillionTokens: 0.06,
+    outputUsdPerMillionTokens: 0.4
+  }
+};
+
+const DEFAULT_MODEL_TOKEN_PRICING: ModelTokenPricing = {
+  inputUsdPerMillionTokens: 0.06,
+  outputUsdPerMillionTokens: 0.4
+};
+
 const DEFAULT_RESERVATION_CREDITS = 1;
-const DEFAULT_NEURON_RATE = { input: 0.02, output: 0.06 };
+
+function getBillingParameters(config: BillingConfig) {
+  const allowedCostRatio = 1 - config.targetGrossMargin;
+  const usdPerNeuron = config.workersUsdPer1000Neurons / 1000;
+  const usdPerCredit =
+    (config.planPriceUsd * allowedCostRatio) / config.includedCredits;
+  const neuronsPerCredit = usdPerCredit / usdPerNeuron;
+  const inputTokensPerCredit =
+    usdPerCredit /
+    (DEFAULT_MODEL_TOKEN_PRICING.inputUsdPerMillionTokens / 1_000_000);
+  const outputTokensPerCredit =
+    usdPerCredit /
+    (DEFAULT_MODEL_TOKEN_PRICING.outputUsdPerMillionTokens / 1_000_000);
+
+  return {
+    usdPerNeuron,
+    usdPerCredit,
+    neuronsPerCredit,
+    inputTokensPerCredit,
+    outputTokensPerCredit
+  };
+}
+
+function getModelTokenPricing(model: string): ModelTokenPricing {
+  return MODEL_TOKEN_PRICING[model] ?? DEFAULT_MODEL_TOKEN_PRICING;
+}
+
+function calculateTokenCostUsd(
+  inputTokens: number,
+  outputTokens: number,
+  model: string
+): number {
+  const pricing = getModelTokenPricing(model);
+
+  return (
+    inputTokens * (pricing.inputUsdPerMillionTokens / 1_000_000) +
+    outputTokens * (pricing.outputUsdPerMillionTokens / 1_000_000)
+  );
+}
+
+function estimateNeuronsFromTokenCost(
+  tokenCostUsd: number,
+  config: BillingConfig = DEFAULT_BILLING_CONFIG
+): number {
+  const { usdPerNeuron } = getBillingParameters(config);
+  return Math.ceil(tokenCostUsd / usdPerNeuron);
+}
+
+function calculateCreditsFromTokenCost(
+  tokenCostUsd: number,
+  config: BillingConfig = DEFAULT_BILLING_CONFIG
+): number {
+  const { usdPerCredit } = getBillingParameters(config);
+  return Math.max(1, Math.ceil(tokenCostUsd / usdPerCredit));
+}
 
 export class CreditService {
   private baseUrl: string;
@@ -15,7 +95,7 @@ export class CreditService {
     this.headers = {
       "Content-Type": "application/json",
       apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
+      Authorization: `Bearer ${serviceRoleKey}`
     };
   }
 
@@ -30,8 +110,8 @@ export class CreditService {
       body: JSON.stringify({
         p_user_id: userId,
         p_agent_run_id: agentRunId,
-        p_credits: credits,
-      }),
+        p_credits: credits
+      })
     });
 
     if (!res.ok) {
@@ -73,8 +153,8 @@ export class CreditService {
         p_neurons: neurons,
         p_model: model,
         p_input_tokens: inputTokens,
-        p_output_tokens: outputTokens,
-      }),
+        p_output_tokens: outputTokens
+      })
     });
 
     if (!res.ok) {
@@ -82,17 +162,14 @@ export class CreditService {
     }
   }
 
-  async releaseReservation(
-    userId: string,
-    agentRunId: string
-  ): Promise<void> {
+  async releaseReservation(userId: string, agentRunId: string): Promise<void> {
     const res = await fetch(`${this.baseUrl}/release_credit_reservation`, {
       method: "POST",
       headers: this.headers,
       body: JSON.stringify({
         p_user_id: userId,
-        p_agent_run_id: agentRunId,
-      }),
+        p_agent_run_id: agentRunId
+      })
     });
 
     if (!res.ok) {
@@ -105,11 +182,17 @@ export class CreditService {
     outputTokens: number,
     model: string
   ): { neurons: number; credits: number } {
-    const rates = MODEL_NEURON_RATES[model] ?? DEFAULT_NEURON_RATE;
-    const neurons = Math.ceil(
-      inputTokens * rates.input + outputTokens * rates.output
+    // Credits are billed from known token pricing so plan economics are exact
+    // for the current model. We still estimate neurons from that same cost for
+    // storage/debugging because the SDK path here does not expose actual
+    // Workers neuron usage.
+    const tokenCostUsd = calculateTokenCostUsd(
+      inputTokens,
+      outputTokens,
+      model
     );
-    const credits = Math.max(1, Math.ceil(neurons / NEURONS_PER_CREDIT));
+    const neurons = estimateNeuronsFromTokenCost(tokenCostUsd);
+    const credits = calculateCreditsFromTokenCost(tokenCostUsd);
     return { neurons, credits };
   }
 }
