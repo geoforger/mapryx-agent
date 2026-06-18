@@ -159,10 +159,7 @@ export class ChatAgent extends AIChatAgent<Env> {
 You help users analyze spatial data, explore layers, run geospatial operations, and understand their geographic datasets. Be concise and technical.
 
 Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolve, etc.) run directly in the user's browser. Server-side tools: echo (debug), getMapryxCapabilities, and task scheduling.
-
-${getSchedulePrompt({ date: new Date() })}
-
-If the user asks to schedule a task, use the scheduleTask tool.`;
+`;
 
     const modelId = "@cf/zai-org/glm-4.7-flash";
 
