@@ -14,7 +14,8 @@ import {
   stepCountIs,
   streamText,
   tool,
-  type ModelMessage
+  type ModelMessage,
+  type UIMessage
 } from "ai";
 import { jwtVerify, type JWTPayload } from "jose";
 import { z } from "zod";
@@ -83,6 +84,292 @@ function inlineDataUrls(messages: ModelMessage[]): ModelMessage[] {
       })
     };
   });
+}
+
+/**
+ * Count the number of tool invocations already made in the current agent turn
+ * (since the last user message). Used to enforce a cumulative tool-call cap
+ * across continuation turns, because stepCountIs() resets on every
+ * onChatMessage() invocation.
+ */
+function countToolCallsInCurrentTurn(messages: UIMessage[]): number {
+  let count = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "user") break;
+    if (msg.role === "assistant") {
+      for (const part of msg.parts ?? []) {
+        const compact = part as { type?: string; toolCallId?: string };
+        if (
+          compact.type === "tool-invocation" ||
+          (compact.type?.startsWith("tool-") && compact.toolCallId)
+        ) {
+          count++;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+const MAPRYX_CLIENT_TOOL_GUIDE = [
+  {
+    name: "run_spatial_query",
+    category: "sql",
+    summary: "Execute DuckDB-WASM spatial SQL and create a result layer.",
+    keywords: ["sql", "query", "duckdb", "st_", "spatial query", "custom"]
+  },
+  {
+    name: "select_layer",
+    category: "selection",
+    summary: "Create a layer from features matching a SQL WHERE filter.",
+    keywords: ["select", "where", "filter features", "subset"]
+  },
+  {
+    name: "buffer_layer",
+    category: "geoprocessing",
+    summary: "Buffer layer features by distance and units.",
+    keywords: ["buffer", "radius", "distance", "near", "around", "within"]
+  },
+  {
+    name: "clip_layer",
+    category: "overlay",
+    summary: "Clip one layer to the boundary of a mask layer.",
+    keywords: ["clip", "mask", "boundary", "cut"]
+  },
+  {
+    name: "intersect_layers",
+    category: "overlay",
+    summary: "Create geometries where two layers overlap.",
+    keywords: ["intersect", "intersection", "overlap", "common area"]
+  },
+  {
+    name: "dissolve_layer",
+    category: "geoprocessing",
+    summary: "Dissolve features, optionally grouped by an attribute.",
+    keywords: ["dissolve", "merge by", "aggregate", "group"]
+  },
+  {
+    name: "split_layer",
+    category: "data management",
+    summary: "Split one layer into layers by unique attribute values.",
+    keywords: ["split", "separate", "unique values", "by attribute"]
+  },
+  {
+    name: "union_layer",
+    category: "geoprocessing",
+    summary: "Union all features in one layer into a single geometry.",
+    keywords: ["union", "combine geometries", "single geometry"]
+  },
+  {
+    name: "attribute_join_layers",
+    category: "data management",
+    summary: "Join two layers/tables on matching attribute values.",
+    keywords: ["attribute join", "join by", "left key", "right key"]
+  },
+  {
+    name: "spatial_join_layers",
+    category: "overlay",
+    summary: "Join attributes between layers by spatial relationship.",
+    keywords: ["spatial join", "join", "contains", "within", "intersects"]
+  },
+  {
+    name: "calculate_geometry",
+    category: "analysis",
+    summary: "Calculate area, length, or perimeter fields.",
+    keywords: ["area", "length", "perimeter", "geometry property", "measure"]
+  },
+  {
+    name: "calculate_field",
+    category: "data management",
+    summary: "Add or update a column from a DuckDB SQL expression.",
+    keywords: ["calculate field", "new column", "expression", "derive"]
+  },
+  {
+    name: "categorize_layer",
+    category: "styling",
+    summary: "Apply categorical symbology from an attribute.",
+    keywords: ["categorize", "category", "symbology", "color by", "style by"]
+  },
+  {
+    name: "filter_layer",
+    category: "styling",
+    summary: "Apply a visual attribute filter to a layer.",
+    keywords: [
+      "visual filter",
+      "hide by filter",
+      "filter layer",
+      "show",
+      "over",
+      "under",
+      "greater than",
+      "less than",
+      "elevation"
+    ]
+  },
+  {
+    name: "toggle_category_visibility",
+    category: "styling",
+    summary: "Show or hide one category value in a categorized layer.",
+    keywords: ["show category", "hide category", "toggle category"]
+  },
+  {
+    name: "update_layer_style",
+    category: "styling",
+    summary: "Change color, opacity, line width, or point radius.",
+    keywords: ["style", "color", "opacity", "line width", "point radius"]
+  },
+  {
+    name: "list_layers",
+    category: "inspection",
+    summary: "List loaded layers, optionally with attributes.",
+    keywords: ["layers", "list layers", "loaded", "visible"]
+  },
+  {
+    name: "inspect_layer",
+    category: "inspection",
+    summary: "Inspect schema and sample data for one layer.",
+    keywords: ["inspect", "schema", "columns", "sample", "table name"]
+  },
+  {
+    name: "get_unique_values",
+    category: "inspection",
+    summary: "Fetch unique values for a layer attribute.",
+    keywords: ["unique values", "distinct", "values", "categories"]
+  },
+  {
+    name: "query_spatial_functions",
+    category: "inspection",
+    summary: "Search available DuckDB spatial functions.",
+    keywords: ["spatial functions", "function", "st_", "duckdb functions"]
+  },
+  {
+    name: "points_to_path",
+    category: "data management",
+    summary: "Connect point features into lines or polygons.",
+    keywords: ["points to path", "line from points", "track", "route"]
+  },
+  {
+    name: "extract_mvt_data",
+    category: "data management",
+    summary: "Extract remote MVT features into a local layer.",
+    keywords: ["mvt", "vector tile", "extract tile", "remote layer"]
+  },
+  {
+    name: "merge_layers",
+    category: "data management",
+    summary: "Merge multiple layers into one layer.",
+    keywords: ["merge layers", "append", "combine layers"]
+  },
+  {
+    name: "erase_layer",
+    category: "overlay",
+    summary: "Erase input features that overlap an erase layer.",
+    keywords: ["erase", "difference", "remove overlap", "subtract"]
+  },
+  {
+    name: "check_system_status",
+    category: "inspection",
+    summary: "Check whether DuckDB spatial support is working.",
+    keywords: ["status", "system", "duckdb spatial", "health"]
+  }
+] as const;
+
+type MapryxClientToolName = (typeof MAPRYX_CLIENT_TOOL_GUIDE)[number]["name"];
+
+const DEFAULT_CLIENT_TOOLS: MapryxClientToolName[] = [
+  "list_layers",
+  "inspect_layer"
+];
+const GENERIC_TOOL_TERMS = new Set([
+  "layer",
+  "layers",
+  "spatial",
+  "tool",
+  "tools"
+]);
+
+function getToolSelectionText(messages: UIMessage[]): string {
+  const recent = messages.slice(-8);
+  return recent
+    .map((message) =>
+      stringify({
+        role: message.role,
+        parts: message.parts?.map((part) => {
+          const compact = part as {
+            type?: string;
+            text?: string;
+            toolName?: string;
+            output?: unknown;
+          };
+          if (compact.type === "text") return compact.text;
+          if (compact.toolName) return compact.toolName;
+          if (compact.output) return stringify(compact.output).slice(0, 1200);
+          return compact.type;
+        })
+      })
+    )
+    .join("\n")
+    .toLowerCase();
+}
+
+function scoreMapryxTool(
+  toolInfo: (typeof MAPRYX_CLIENT_TOOL_GUIDE)[number],
+  query: string
+): number {
+  let score = 0;
+  if (query.includes(toolInfo.name.toLowerCase())) score += 8;
+  if (query.includes(toolInfo.category)) score += 2;
+  for (const keyword of toolInfo.keywords) {
+    if (query.includes(keyword.toLowerCase())) score += 3;
+  }
+  for (const term of toolInfo.name.split("_")) {
+    if (
+      term.length > 3 &&
+      !GENERIC_TOOL_TERMS.has(term) &&
+      query.includes(term)
+    ) {
+      score += 1;
+    }
+  }
+  return score;
+}
+
+function searchMapryxClientTools(query: string, limit = 6) {
+  const normalizedQuery = query.toLowerCase();
+  return MAPRYX_CLIENT_TOOL_GUIDE.map((toolInfo) => ({
+    ...toolInfo,
+    score: scoreMapryxTool(toolInfo, normalizedQuery)
+  }))
+    .filter((toolInfo) => toolInfo.score > 0)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map(({ score: _score, keywords: _keywords, ...toolInfo }) => toolInfo);
+}
+
+function selectMapryxClientTools(
+  messages: UIMessage[]
+): MapryxClientToolName[] {
+  const searchText = getToolSelectionText(messages);
+  const selected = new Set<MapryxClientToolName>(DEFAULT_CLIENT_TOOLS);
+
+  for (const result of searchMapryxClientTools(searchText, 8)) {
+    selected.add(result.name);
+  }
+
+  if (
+    /\bst_|sql|duckdb|query|where|join|buffer|clip|intersect/.test(searchText)
+  ) {
+    selected.add("run_spatial_query");
+  }
+
+  return [...selected].slice(0, 10);
+}
+
+function shouldExposeScheduleTools(messages: UIMessage[]): boolean {
+  return /\bschedule|scheduled|remind|reminder|later|tomorrow|cron|daily|weekly|monthly|cancel.+task|tasks?\b/.test(
+    getToolSelectionText(messages)
+  );
 }
 
 export class ChatAgent extends AIChatAgent<Env> {
@@ -208,7 +495,7 @@ export class ChatAgent extends AIChatAgent<Env> {
 
 You help users analyze spatial data, explore layers, run geospatial operations, and understand their geographic datasets. Be concise and technical.
 
-Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolve, etc.) run directly in the user's browser. Server-side tools: echo (debug), getMapryxCapabilities, and task scheduling.
+Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolve, etc.) run directly in the user's browser. The server exposes only the browser tools likely needed for the current request. Use searchMapryxTools when you need to discover a tool before acting. Server-side tools: echo (debug), getMapryxCapabilities, searchMapryxTools, and task scheduling.
 `;
 
     const modelId = "@cf/zai-org/glm-4.7-flash";
@@ -218,7 +505,16 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
     // -----------------------------------------------------------------------
     const lastClientMessage = this.messages[this.messages.length - 1];
     // UIMessage uses `parts` (not `content`) — serialise the whole message for logging
-    const rawClientText = lastClientMessage ? stringify((lastClientMessage as unknown as { parts?: unknown; content?: unknown }).parts ?? lastClientMessage) : "";
+    const rawClientText = lastClientMessage
+      ? stringify(
+          (
+            lastClientMessage as unknown as {
+              parts?: unknown;
+              content?: unknown;
+            }
+          ).parts ?? lastClientMessage
+        )
+      : "";
     const clientTokensEst = estimateTokens(rawClientText);
 
     console.log(
@@ -229,11 +525,19 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
       "╚══════════════════════════════════════════════════════════════╝"
     );
     console.log(`[token-log] userId        : ${userId ?? "(anonymous)"}`);
-    console.log(`[token-log] agentRunId    : ${agentRunId ?? "(no credit run)"}`);
+    console.log(
+      `[token-log] agentRunId    : ${agentRunId ?? "(no credit run)"}`
+    );
     console.log(`[token-log] model         : ${modelId}`);
-    console.log(`[token-log] client msgs   : ${this.messages.length} stored message(s)`);
-    console.log(`[token-log] last role     : ${lastClientMessage?.role ?? "n/a"}`);
-    console.log(`[token-log] ~client tokens: ${clientTokensEst} (last message)`);
+    console.log(
+      `[token-log] client msgs   : ${this.messages.length} stored message(s)`
+    );
+    console.log(
+      `[token-log] last role     : ${lastClientMessage?.role ?? "n/a"}`
+    );
+    console.log(
+      `[token-log] ~client tokens: ${clientTokensEst} (last message)`
+    );
     console.log("[token-log] FULL last message content:");
     console.log(rawClientText);
 
@@ -257,8 +561,12 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
       "╚══════════════════════════════════════════════════════════════╝"
     );
     console.log(`[token-log] ~system prompt tokens : ${systemPromptTokensEst}`);
-    console.log(`[token-log] system prompt source  : ${body?.systemPrompt ? "client-injected" : "default fallback"}`);
-    console.log(`[token-log] history messages count: ${prunedMessages.length} (after pruning)`);
+    console.log(
+      `[token-log] system prompt source  : ${body?.systemPrompt ? "client-injected" : "default fallback"}`
+    );
+    console.log(
+      `[token-log] history messages count: ${prunedMessages.length} (after pruning)`
+    );
     console.log(`[token-log] ~history tokens       : ${historyTokensEst}`);
     console.log(
       "\n╔══════════════════════════════════════════════════════════════╗"
@@ -275,6 +583,35 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
     console.log(systemPrompt);
     console.log("[token-log] FULL pruned messages going to LLM:");
     console.log(JSON.stringify(prunedMessages, null, 2));
+
+    // Compute remaining budget relative to tool calls already made this turn.
+    // This prevents the infinite-loop bug where stepCountIs resets on every
+    // continuation (each client tool result triggers a new onChatMessage call).
+    const MAX_TOOL_CALLS_PER_TURN = 10;
+    const toolCallsThisTurn = countToolCallsInCurrentTurn(
+      this.messages as unknown as UIMessage[]
+    );
+    const remainingSteps = Math.max(
+      1,
+      MAX_TOOL_CALLS_PER_TURN - toolCallsThisTurn
+    );
+
+    console.log(
+      `[step-guard] tool calls this turn: ${toolCallsThisTurn}, remaining steps: ${remainingSteps}`
+    );
+
+    const selectedClientToolNames = selectMapryxClientTools(
+      this.messages as unknown as UIMessage[]
+    );
+    const exposeScheduleTools = shouldExposeScheduleTools(
+      this.messages as unknown as UIMessage[]
+    );
+    console.log(
+      `[tool-selection] client tools exposed: ${selectedClientToolNames.join(", ")}`
+    );
+    console.log(
+      `[tool-selection] schedule tools exposed: ${exposeScheduleTools ? "yes" : "no"}`
+    );
 
     let result;
     try {
@@ -303,409 +640,559 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
 
           getMapryxCapabilities: tool({
             description:
-              "Get the list of available Mapryx geospatial capabilities and tools",
-            inputSchema: z.object({}),
-            execute: async () => ({
-              serverTools: [
-                "echo",
-                "getMapryxCapabilities",
-                "scheduleTask",
-                "getScheduledTasks",
-                "cancelScheduledTask"
-              ],
-              frontendTools: [
-                "runDuckDBQuery",
-                "addLayer",
-                "fitToBounds",
-                "spatialJoin",
-                "buffer",
-                "clip",
-                "dissolve",
-                "exportLayer"
-              ],
-              note: "Frontend tools are injected by the Mapryx client at runtime"
-            })
-          }),
-
-          scheduleTask: tool({
-            description:
-              "Schedule a task to be executed at a later time. Use this when the user asks to be reminded or wants something done later.",
-            inputSchema: scheduleSchema,
-            execute: async ({ when, description }) => {
-              if (when.type === "no-schedule") {
-                return "Not a valid schedule input";
-              }
-              const input =
-                when.type === "scheduled"
-                  ? when.date
-                  : when.type === "delayed"
-                    ? when.delayInSeconds
-                    : when.type === "cron"
-                      ? when.cron
-                      : null;
-              if (!input) return "Invalid schedule type";
-              try {
-                this.schedule(input, "executeTask", description, {
-                  idempotent: true
-                });
-                return `Task scheduled: "${description}" (${when.type}: ${input})`;
-              } catch (error) {
-                return `Error scheduling task: ${error}`;
-              }
-            }
-          }),
-
-          getScheduledTasks: tool({
-            description: "List all tasks that have been scheduled",
+              "Get a compact categorized overview of available Mapryx geospatial capabilities. Use searchMapryxTools for detailed tool matches.",
             inputSchema: z.object({}),
             execute: async () => {
-              const tasks = this.getSchedules();
-              return tasks.length > 0 ? tasks : "No scheduled tasks found.";
+              const categories = MAPRYX_CLIENT_TOOL_GUIDE.reduce<
+                Record<string, string[]>
+              >((acc, toolInfo) => {
+                acc[toolInfo.category] = acc[toolInfo.category] ?? [];
+                acc[toolInfo.category].push(toolInfo.name);
+                return acc;
+              }, {});
+
+              return {
+                serverTools: [
+                  "echo",
+                  "getMapryxCapabilities",
+                  "searchMapryxTools",
+                  ...(exposeScheduleTools
+                    ? [
+                        "scheduleTask",
+                        "getScheduledTasks",
+                        "cancelScheduledTask"
+                      ]
+                    : [])
+                ],
+                browserToolCategories: categories,
+                activeBrowserTools: selectedClientToolNames,
+                guidance:
+                  "Browser tools execute in the Mapryx client. Call searchMapryxTools with the user's intent when the needed exact tool is not currently active."
+              };
             }
           }),
 
-          cancelScheduledTask: tool({
-            description: "Cancel a scheduled task by its ID",
-            inputSchema: z.object({
-              taskId: z.string().describe("The ID of the task to cancel")
-            }),
-            execute: async ({ taskId }) => {
-              try {
-                this.cancelSchedule(taskId);
-                return `Task ${taskId} cancelled.`;
-              } catch (error) {
-                return `Error cancelling task: ${error}`;
-              }
-            }
-          }),
-
-          // --- Mapryx spatial tools — executed in the browser via onToolCall ---
-          run_spatial_query: tool({
+          searchMapryxTools: tool({
             description:
-              "Execute a DuckDB-WASM spatial SQL query and add the result as a new layer",
+              "Search Mapryx browser-executed geospatial tools by intent and return compact matching tool names and summaries.",
             inputSchema: z.object({
-              query: z.string().describe("SQL query to execute"),
-              description: z
+              query: z
                 .string()
-                .describe("Human-readable description of what this query does")
-            })
-          }),
-
-          select_layer: tool({
-            description:
-              "Filter features from a layer using a SQL WHERE condition",
-            inputSchema: z.object({
-              layerName: z.string().describe("Source layer name"),
-              filter: z.string().optional().describe("SQL WHERE clause"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          buffer_layer: tool({
-            description:
-              "Create a buffer around each feature by distance and units",
-            inputSchema: z.object({
-              layerName: z.string().describe("Layer to buffer"),
-              distance: z.number().describe("Buffer distance"),
-              units: z
-                .enum(["meters", "kilometers", "miles", "feet"])
-                .describe("Distance units"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          clip_layer: tool({
-            description: "Clip a layer to the boundary of a mask layer",
-            inputSchema: z.object({
-              layerName: z.string().describe("Layer to clip"),
-              maskLayerName: z.string().describe("Mask layer"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          intersect_layers: tool({
-            description: "Compute the geometric intersection of two layers",
-            inputSchema: z.object({
-              layerName: z.string().describe("First layer"),
-              targetLayerName: z.string().describe("Second layer"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          dissolve_layer: tool({
-            description:
-              "Dissolve features in a layer, optionally grouped by an attribute",
-            inputSchema: z.object({
-              layerName: z.string().describe("Layer to dissolve"),
-              groupByAttribute: z
-                .string()
-                .optional()
-                .describe("Attribute to group by"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          split_layer: tool({
-            description:
-              "Split a layer into multiple layers based on unique values of an attribute",
-            inputSchema: z.object({
-              layerName: z.string().describe("Layer to split"),
-              splitByAttribute: z.string().describe("Attribute to split by"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Base name for output layers")
-            })
-          }),
-
-          union_layer: tool({
-            description: "Union all features in a layer into a single geometry",
-            inputSchema: z.object({
-              layerName: z.string().describe("Layer to union"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          attribute_join_layers: tool({
-            description: "Join two layers on matching attribute values",
-            inputSchema: z.object({
-              leftLayerName: z.string().describe("Left layer"),
-              rightLayerName: z.string().describe("Right layer"),
-              leftKey: z.string().describe("Join key in left layer"),
-              rightKey: z.string().describe("Join key in right layer"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          spatial_join_layers: tool({
-            description: "Join two layers based on spatial relationship",
-            inputSchema: z.object({
-              leftLayerName: z.string().describe("Base layer"),
-              rightLayerName: z.string().describe("Layer to join"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
-
-          calculate_geometry: tool({
-            description:
-              "Calculate a geometry property (area, length, perimeter) for each feature",
-            inputSchema: z.object({
-              layerName: z.string().describe("Target layer"),
-              property: z
-                .enum(["area", "length", "perimeter"])
-                .describe("Property to calculate"),
-              unit: z.string().optional().describe("Unit of measurement"),
-              srid: z
-                .string()
-                .optional()
-                .describe("Projection SRID (e.g. EPSG:3857)"),
-              decimalPlaces: z
-                .number()
-                .optional()
-                .describe("Decimal places for result")
-            })
-          }),
-
-          calculate_field: tool({
-            description: "Add or update a column using a SQL expression",
-            inputSchema: z.object({
-              layerName: z.string().describe("Target layer"),
-              columnName: z
-                .string()
-                .describe("Column name to create or update"),
-              dataType: z
-                .string()
-                .describe("SQL data type (e.g. DOUBLE, VARCHAR)"),
-              expression: z.string().describe("SQL expression for the value")
-            })
-          }),
-
-          categorize_layer: tool({
-            description:
-              "Apply categorical symbology to a layer based on an attribute",
-            inputSchema: z.object({
-              layerName: z.string().describe("Target layer"),
-              attributeName: z.string().describe("Attribute to categorize by")
-            })
-          }),
-
-          filter_layer: tool({
-            description:
-              "Apply a visual filter to a layer based on attribute conditions",
-            inputSchema: z.object({
-              layerName: z.string().describe("Target layer"),
-              filters: z
-                .array(
-                  z.object({
-                    attribute: z.string(),
-                    operator: z.string(),
-                    value: z.union([z.string(), z.number()])
-                  })
-                )
-                .describe("Filter conditions")
-            })
-          }),
-
-          toggle_category_visibility: tool({
-            description:
-              "Show or hide a specific category value in a categorized layer",
-            inputSchema: z.object({
-              layerName: z.string().describe("Target layer"),
-              categoryValue: z.string().describe("Category value to toggle"),
-              action: z.enum(["show", "hide"]).describe("Action to take")
-            })
-          }),
-
-          update_layer_style: tool({
-            description: "Update the visual style of a layer",
-            inputSchema: z.object({
-              layerName: z.string().describe("Target layer"),
-              style: z
-                .object({
-                  color: z.string().optional(),
-                  opacity: z.number().optional(),
-                  lineWidth: z.number().optional(),
-                  pointRadius: z.number().optional()
-                })
-                .describe("Style properties to update")
-            })
-          }),
-
-          list_layers: tool({
-            description:
-              "List all loaded layers with optional attribute details",
-            inputSchema: z.object({
-              includeAttributes: z
-                .boolean()
-                .optional()
-                .describe("Include attribute names"),
-              visibleOnly: z
-                .boolean()
-                .optional()
-                .describe("Only return visible layers")
-            })
-          }),
-
-          inspect_layer: tool({
-            description: "Get detailed schema and sample data from a layer",
-            inputSchema: z.object({
-              layerName: z.string().describe("Layer to inspect")
-            })
-          }),
-
-          get_unique_values: tool({
-            description: "Get unique values for an attribute in a layer",
-            inputSchema: z.object({
-              layerName: z.string().describe("Target layer"),
-              attributeName: z
-                .string()
-                .describe("Attribute to get unique values for"),
+                .describe("User intent or operation to search for"),
               limit: z
                 .number()
+                .min(1)
+                .max(10)
                 .optional()
-                .describe("Maximum number of values to return")
+                .describe("Maximum number of matching tools to return")
+            }),
+            execute: async ({ query, limit }) => ({
+              matches: searchMapryxClientTools(query, limit ?? 6),
+              activeBrowserTools: selectedClientToolNames,
+              note: "If a matching tool is not active, ask the user to restate the operation with the tool name or continue with an active equivalent such as run_spatial_query when present."
             })
           }),
 
-          query_spatial_functions: tool({
-            description:
-              "Search for available DuckDB spatial functions matching a pattern",
-            inputSchema: z.object({
-              functionPattern: z
-                .string()
-                .describe("Pattern to search for (e.g. ST_Buffer)")
-            })
-          }),
+          ...(exposeScheduleTools
+            ? {
+                scheduleTask: tool({
+                  description:
+                    "Schedule a task to be executed at a later time. Use this when the user asks to be reminded or wants something done later.",
+                  inputSchema: scheduleSchema,
+                  execute: async ({ when, description }) => {
+                    if (when.type === "no-schedule") {
+                      return "Not a valid schedule input";
+                    }
+                    const input =
+                      when.type === "scheduled"
+                        ? when.date
+                        : when.type === "delayed"
+                          ? when.delayInSeconds
+                          : when.type === "cron"
+                            ? when.cron
+                            : null;
+                    if (!input) return "Invalid schedule type";
+                    try {
+                      this.schedule(input, "executeTask", description, {
+                        idempotent: true
+                      });
+                      return `Task scheduled: "${description}" (${when.type}: ${input})`;
+                    } catch (error) {
+                      return `Error scheduling task: ${error}`;
+                    }
+                  }
+                }),
 
-          points_to_path: tool({
-            description:
-              "Connect point features into a path/line based on an ordering attribute",
-            inputSchema: z.object({
-              layerName: z.string().describe("Point layer to convert"),
-              orderByAttribute: z
-                .string()
-                .optional()
-                .describe("Attribute to order points by"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the output layer")
-            })
-          }),
+                getScheduledTasks: tool({
+                  description: "List all tasks that have been scheduled",
+                  inputSchema: z.object({}),
+                  execute: async () => {
+                    const tasks = this.getSchedules();
+                    return tasks.length > 0
+                      ? tasks
+                      : "No scheduled tasks found.";
+                  }
+                }),
 
-          extract_mvt_data: tool({
-            description:
-              "Extract features from a remote MVT layer into a local manageable layer by fetching and merging tiles",
-            inputSchema: z.object({
-              layerId: z
-                .string()
-                .describe("ID of the MVT layer to extract from"),
-              zoom: z.number().describe("Zoom level to extract at"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the resulting vector layer")
-            })
-          }),
+                cancelScheduledTask: tool({
+                  description: "Cancel a scheduled task by its ID",
+                  inputSchema: z.object({
+                    taskId: z.string().describe("The ID of the task to cancel")
+                  }),
+                  execute: async ({ taskId }) => {
+                    try {
+                      this.cancelSchedule(taskId);
+                      return `Task ${taskId} cancelled.`;
+                    } catch (error) {
+                      return `Error cancelling task: ${error}`;
+                    }
+                  }
+                })
+              }
+            : {}),
 
-          merge_layers: tool({
-            description:
-              "Combine multiple layers into a single new layer with merged attributes",
-            inputSchema: z.object({
-              layerNames: z
-                .array(z.string())
-                .describe("Names or partial names of layers to merge"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the resulting layer")
-            })
-          }),
+          // --- Mapryx spatial tools — executed in the browser via onToolCall ---
+          ...(selectedClientToolNames.includes("run_spatial_query")
+            ? {
+                run_spatial_query: tool({
+                  description:
+                    "Execute a DuckDB-WASM spatial SQL query and add the result as a new layer",
+                  inputSchema: z.object({
+                    query: z.string().describe("SQL query to execute"),
+                    description: z
+                      .string()
+                      .describe(
+                        "Human-readable description of what this query does"
+                      )
+                  })
+                })
+              }
+            : {}),
 
-          erase_layer: tool({
-            description:
-              "Erase features in the input layer that overlap with features in the erase layer",
-            inputSchema: z.object({
-              layerName: z.string().describe("Input layer to erase from"),
-              eraseLayerName: z.string().describe("Layer used for erasing"),
-              outputName: z
-                .string()
-                .optional()
-                .describe("Name for the resulting layer")
-            })
-          }),
+          ...(selectedClientToolNames.includes("select_layer")
+            ? {
+                select_layer: tool({
+                  description:
+                    "Filter features from a layer using a SQL WHERE condition",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Source layer name"),
+                    filter: z.string().optional().describe("SQL WHERE clause"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
 
-          check_system_status: tool({
-            description:
-              "Check if the DuckDB spatial extension is loaded and working",
-            inputSchema: z.object({})
-          })
+          ...(selectedClientToolNames.includes("buffer_layer")
+            ? {
+                buffer_layer: tool({
+                  description:
+                    "Create a buffer around each feature by distance and units",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Layer to buffer"),
+                    distance: z.number().describe("Buffer distance"),
+                    units: z
+                      .enum(["meters", "kilometers", "miles", "feet"])
+                      .describe("Distance units"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("clip_layer")
+            ? {
+                clip_layer: tool({
+                  description: "Clip a layer to the boundary of a mask layer",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Layer to clip"),
+                    maskLayerName: z.string().describe("Mask layer"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("intersect_layers")
+            ? {
+                intersect_layers: tool({
+                  description:
+                    "Compute the geometric intersection of two layers",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("First layer"),
+                    targetLayerName: z.string().describe("Second layer"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("dissolve_layer")
+            ? {
+                dissolve_layer: tool({
+                  description:
+                    "Dissolve features in a layer, optionally grouped by an attribute",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Layer to dissolve"),
+                    groupByAttribute: z
+                      .string()
+                      .optional()
+                      .describe("Attribute to group by"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("split_layer")
+            ? {
+                split_layer: tool({
+                  description:
+                    "Split a layer into multiple layers based on unique values of an attribute",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Layer to split"),
+                    splitByAttribute: z
+                      .string()
+                      .describe("Attribute to split by"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Base name for output layers")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("union_layer")
+            ? {
+                union_layer: tool({
+                  description:
+                    "Union all features in a layer into a single geometry",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Layer to union"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("attribute_join_layers")
+            ? {
+                attribute_join_layers: tool({
+                  description: "Join two layers on matching attribute values",
+                  inputSchema: z.object({
+                    leftLayerName: z.string().describe("Left layer"),
+                    rightLayerName: z.string().describe("Right layer"),
+                    leftKey: z.string().describe("Join key in left layer"),
+                    rightKey: z.string().describe("Join key in right layer"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("spatial_join_layers")
+            ? {
+                spatial_join_layers: tool({
+                  description: "Join two layers based on spatial relationship",
+                  inputSchema: z.object({
+                    leftLayerName: z.string().describe("Base layer"),
+                    rightLayerName: z.string().describe("Layer to join"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("calculate_geometry")
+            ? {
+                calculate_geometry: tool({
+                  description:
+                    "Calculate a geometry property (area, length, perimeter) for each feature",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Target layer"),
+                    property: z
+                      .enum(["area", "length", "perimeter"])
+                      .describe("Property to calculate"),
+                    unit: z.string().optional().describe("Unit of measurement"),
+                    srid: z
+                      .string()
+                      .optional()
+                      .describe("Projection SRID (e.g. EPSG:3857)"),
+                    decimalPlaces: z
+                      .number()
+                      .optional()
+                      .describe("Decimal places for result")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("calculate_field")
+            ? {
+                calculate_field: tool({
+                  description: "Add or update a column using a SQL expression",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Target layer"),
+                    columnName: z
+                      .string()
+                      .describe("Column name to create or update"),
+                    dataType: z
+                      .string()
+                      .describe("SQL data type (e.g. DOUBLE, VARCHAR)"),
+                    expression: z
+                      .string()
+                      .describe("SQL expression for the value")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("categorize_layer")
+            ? {
+                categorize_layer: tool({
+                  description:
+                    "Apply categorical symbology to a layer based on an attribute",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Target layer"),
+                    attributeName: z
+                      .string()
+                      .describe("Attribute to categorize by")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("filter_layer")
+            ? {
+                filter_layer: tool({
+                  description:
+                    "Apply a visual filter to a layer based on attribute conditions",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Target layer"),
+                    filters: z
+                      .array(
+                        z.object({
+                          attribute: z.string(),
+                          operator: z.string(),
+                          value: z.union([z.string(), z.number()])
+                        })
+                      )
+                      .describe("Filter conditions")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("toggle_category_visibility")
+            ? {
+                toggle_category_visibility: tool({
+                  description:
+                    "Show or hide a specific category value in a categorized layer",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Target layer"),
+                    categoryValue: z
+                      .string()
+                      .describe("Category value to toggle"),
+                    action: z.enum(["show", "hide"]).describe("Action to take")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("update_layer_style")
+            ? {
+                update_layer_style: tool({
+                  description: "Update the visual style of a layer",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Target layer"),
+                    style: z
+                      .object({
+                        color: z.string().optional(),
+                        opacity: z.number().optional(),
+                        lineWidth: z.number().optional(),
+                        pointRadius: z.number().optional()
+                      })
+                      .describe("Style properties to update")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("list_layers")
+            ? {
+                list_layers: tool({
+                  description:
+                    "List all loaded layers with optional attribute details",
+                  inputSchema: z.object({
+                    includeAttributes: z
+                      .boolean()
+                      .optional()
+                      .describe("Include attribute names"),
+                    visibleOnly: z
+                      .boolean()
+                      .optional()
+                      .describe("Only return visible layers")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("inspect_layer")
+            ? {
+                inspect_layer: tool({
+                  description:
+                    "Get detailed schema and sample data from a layer",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Layer to inspect")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("get_unique_values")
+            ? {
+                get_unique_values: tool({
+                  description: "Get unique values for an attribute in a layer",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Target layer"),
+                    attributeName: z
+                      .string()
+                      .describe("Attribute to get unique values for"),
+                    limit: z
+                      .number()
+                      .optional()
+                      .describe("Maximum number of values to return")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("query_spatial_functions")
+            ? {
+                query_spatial_functions: tool({
+                  description:
+                    "Search for available DuckDB spatial functions matching a pattern",
+                  inputSchema: z.object({
+                    functionPattern: z
+                      .string()
+                      .describe("Pattern to search for (e.g. ST_Buffer)")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("points_to_path")
+            ? {
+                points_to_path: tool({
+                  description:
+                    "Connect point features into a path/line based on an ordering attribute",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Point layer to convert"),
+                    orderByAttribute: z
+                      .string()
+                      .optional()
+                      .describe("Attribute to order points by"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the output layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("extract_mvt_data")
+            ? {
+                extract_mvt_data: tool({
+                  description:
+                    "Extract features from a remote MVT layer into a local manageable layer by fetching and merging tiles",
+                  inputSchema: z.object({
+                    layerId: z
+                      .string()
+                      .describe("ID of the MVT layer to extract from"),
+                    zoom: z.number().describe("Zoom level to extract at"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the resulting vector layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("merge_layers")
+            ? {
+                merge_layers: tool({
+                  description:
+                    "Combine multiple layers into a single new layer with merged attributes",
+                  inputSchema: z.object({
+                    layerNames: z
+                      .array(z.string())
+                      .describe("Names or partial names of layers to merge"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the resulting layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("erase_layer")
+            ? {
+                erase_layer: tool({
+                  description:
+                    "Erase features in the input layer that overlap with features in the erase layer",
+                  inputSchema: z.object({
+                    layerName: z.string().describe("Input layer to erase from"),
+                    eraseLayerName: z
+                      .string()
+                      .describe("Layer used for erasing"),
+                    outputName: z
+                      .string()
+                      .optional()
+                      .describe("Name for the resulting layer")
+                  })
+                })
+              }
+            : {}),
+
+          ...(selectedClientToolNames.includes("check_system_status")
+            ? {
+                check_system_status: tool({
+                  description:
+                    "Check if the DuckDB spatial extension is loaded and working",
+                  inputSchema: z.object({})
+                })
+              }
+            : {})
         },
-        stopWhen: stepCountIs(10),
+        stopWhen: stepCountIs(remainingSteps),
         abortSignal: options?.abortSignal
       });
     } catch (error) {
@@ -720,22 +1207,32 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
     // -----------------------------------------------------------------------
     this.ctx.waitUntil(
       // Wrap in Promise.resolve() because result.usage is PromiseLike (no .catch)
-      Promise.resolve(result.usage).then((usage) => {
-        console.log(
-          "\n╔══════════════════════════════════════════════════════════════╗"
-        );
-        console.log("║  [token-log] ACTUAL LLM TOKEN USAGE (reported by API)");
-        console.log(
-          "╚══════════════════════════════════════════════════════════════╝"
-        );
-        console.log(`[token-log] input tokens  (actual): ${usage.inputTokens ?? "n/a"}`);
-        console.log(`[token-log] output tokens (actual): ${usage.outputTokens ?? "n/a"}`);
-        console.log(`[token-log] total tokens  (actual): ${(usage.inputTokens ?? 0) + (usage.outputTokens ?? 0)}`);
-        console.log(`[token-log] userId        : ${userId ?? "(anonymous)"}`);
-        console.log(`[token-log] model         : ${modelId}`);
-      }).catch((err: unknown) => {
-        console.warn("[token-log] could not read usage:", err);
-      })
+      Promise.resolve(result.usage)
+        .then((usage) => {
+          console.log(
+            "\n╔══════════════════════════════════════════════════════════════╗"
+          );
+          console.log(
+            "║  [token-log] ACTUAL LLM TOKEN USAGE (reported by API)"
+          );
+          console.log(
+            "╚══════════════════════════════════════════════════════════════╝"
+          );
+          console.log(
+            `[token-log] input tokens  (actual): ${usage.inputTokens ?? "n/a"}`
+          );
+          console.log(
+            `[token-log] output tokens (actual): ${usage.outputTokens ?? "n/a"}`
+          );
+          console.log(
+            `[token-log] total tokens  (actual): ${(usage.inputTokens ?? 0) + (usage.outputTokens ?? 0)}`
+          );
+          console.log(`[token-log] userId        : ${userId ?? "(anonymous)"}`);
+          console.log(`[token-log] model         : ${modelId}`);
+        })
+        .catch((err: unknown) => {
+          console.warn("[token-log] could not read usage:", err);
+        })
     );
 
     if (creditService && userId && agentRunId) {
