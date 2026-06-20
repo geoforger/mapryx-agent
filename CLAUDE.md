@@ -35,9 +35,9 @@ Uses `oxlint` (not ESLint) and `oxfmt` (not Prettier). Configuration in `.oxlint
 
 ## Deployment
 
-| Environment | Trigger |
-|-------------|---------|
-| Local | `npm run dev` |
-| Production | `npm run deploy` (Cloudflare Workers — name: `mapryx-agent-v2`) |
+| Environment | Trigger                                                         |
+| ----------- | --------------------------------------------------------------- |
+| Local       | `npm run dev`                                                   |
+| Production  | `npm run deploy` (Cloudflare Workers — name: `mapryx-agent-v2`) |
 
 No CI/CD pipeline — deploy manually via `npm run deploy`.

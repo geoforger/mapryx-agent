@@ -230,7 +230,9 @@ function loadSessions(): { id: string; name: string; createdAt: number }[] {
   }
 }
 
-function saveSessions(sessions: { id: string; name: string; createdAt: number }[]) {
+function saveSessions(
+  sessions: { id: string; name: string; createdAt: number }[]
+) {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
 }
 
@@ -250,40 +252,83 @@ function SessionSidebar({
   return (
     <div className="w-56 shrink-0 flex flex-col bg-kumo-base border-r border-kumo-line h-screen overflow-hidden">
       <div className="px-3 py-3 border-b border-kumo-line flex items-center justify-between">
-        <Text size="xs" variant="secondary" bold>SESSIONS</Text>
-        <Button variant="ghost" size="sm" shape="square" icon={<PlusIcon size={14} />} onClick={onCreate} aria-label="New session" />
+        <Text size="xs" variant="secondary" bold>
+          SESSIONS
+        </Text>
+        <Button
+          variant="ghost"
+          size="sm"
+          shape="square"
+          icon={<PlusIcon size={14} />}
+          onClick={onCreate}
+          aria-label="New session"
+        />
       </div>
       <div className="flex-1 overflow-y-auto py-1">
         {sessions.length === 0 && (
           <div className="px-3 py-4 text-center">
-            <Text size="xs" variant="secondary">No sessions yet</Text>
+            <Text size="xs" variant="secondary">
+              No sessions yet
+            </Text>
           </div>
         )}
-        {sessions.sort((a, b) => b.createdAt - a.createdAt).map(s => (
-          <div
-            key={s.id}
-            className={`group flex items-center gap-1 px-2 py-1.5 mx-1 rounded-lg cursor-pointer ${s.id === activeId ? "bg-kumo-control" : "hover:bg-kumo-elevated"}`}
-            onClick={() => onSelect(s.id)}
-          >
-            <ChatCircleDotsIcon size={13} className={s.id === activeId ? "text-kumo-accent shrink-0" : "text-kumo-inactive shrink-0"} />
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-kumo-default truncate">{s.name}</div>
-              <div className="text-[10px] text-kumo-inactive">{new Date(s.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+        {sessions
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .map((s) => {
+            // eslint-disable-next-line jsx-a11y/prefer-tag-over-role
+            return (
+              <div
+                key={s.id}
+              role="button"
+              tabIndex={0}
+              className={`group flex items-center gap-1 px-2 py-1.5 mx-1 rounded-lg cursor-pointer ${s.id === activeId ? "bg-kumo-control" : "hover:bg-kumo-elevated"}`}
+              onClick={() => onSelect(s.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(s.id);
+                }
+              }}
+            >
+              <ChatCircleDotsIcon
+                size={13}
+                className={
+                  s.id === activeId
+                    ? "text-kumo-accent shrink-0"
+                    : "text-kumo-inactive shrink-0"
+                }
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-kumo-default truncate">
+                  {s.name}
+                </div>
+                <div className="text-[10px] text-kumo-inactive">
+                  {new Date(s.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })}
+                </div>
+              </div>
+              {sessions.length > 1 && (
+                <button
+                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-kumo-inactive hover:text-kumo-danger transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(s.id);
+                  }}
+                  aria-label="Delete session"
+                >
+                  <TrashIcon size={11} />
+                </button>
+              )}
             </div>
-            {sessions.length > 1 && (
-              <button
-                className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-kumo-inactive hover:text-kumo-danger transition-opacity"
-                onClick={(e) => { e.stopPropagation(); onDelete(s.id); }}
-                aria-label="Delete session"
-              >
-                <TrashIcon size={11} />
-              </button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="px-3 py-2 border-t border-kumo-line">
-        <Text size="xs" variant="secondary">Each session = its own Durable Object</Text>
+        <Text size="xs" variant="secondary">
+          Each session = its own Durable Object
+        </Text>
       </div>
     </div>
   );
@@ -291,7 +336,13 @@ function SessionSidebar({
 
 // ── Main chat ─────────────────────────────────────────────────────────
 
-function Chat({ sessionId, sessionName }: { sessionId: string; sessionName: string }) {
+function Chat({
+  sessionId,
+  sessionName
+}: {
+  sessionId: string;
+  sessionName: string;
+}) {
   const [connected, setConnected] = useState(false);
   const [input, setInput] = useState("");
   const [showDebug, setShowDebug] = useState(false);
@@ -516,7 +567,9 @@ function Chat({ sessionId, sessionName }: { sessionId: string; sessionName: stri
               <ChatCircleDotsIcon size={12} weight="bold" className="mr-1" />
               Geospatial AI
             </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px]">{sessionId.slice(0, 8)}…</Badge>
+            <Badge variant="secondary" className="font-mono text-[10px]">
+              {sessionId.slice(0, 8)}…
+            </Badge>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
@@ -1000,7 +1053,7 @@ function AppInner() {
   });
   const [activeId, setActiveId] = useState(() => sessions[0]?.id ?? "default");
 
-  const activeSession = sessions.find(s => s.id === activeId) ?? sessions[0];
+  const activeSession = sessions.find((s) => s.id === activeId) ?? sessions[0];
 
   const handleCreate = () => {
     const id = crypto.randomUUID();
@@ -1012,7 +1065,7 @@ function AppInner() {
   };
 
   const handleDelete = (id: string) => {
-    const next = sessions.filter(s => s.id !== id);
+    const next = sessions.filter((s) => s.id !== id);
     setSessions(next);
     saveSessions(next);
     if (activeId === id) setActiveId(next[0]?.id ?? "default");
@@ -1028,7 +1081,11 @@ function AppInner() {
         onDelete={handleDelete}
       />
       <div className="flex-1 min-w-0">
-        <Chat key={activeId} sessionId={activeSession?.id ?? "default"} sessionName={activeSession?.name ?? "Default"} />
+        <Chat
+          key={activeId}
+          sessionId={activeSession?.id ?? "default"}
+          sessionName={activeSession?.name ?? "Default"}
+        />
       </div>
     </div>
   );

@@ -149,6 +149,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: Executes all spatial tools and queries called by the AI assistant.
 
 **Key Functions**:
+
 - `executeSpatialQuery(query, description)` - Execute DuckDB spatial SQL
 - `executeSelectLayer(layerName, filter, outputName)` - Filter layer
 - `executeBufferLayer(layerName, distance, units, outputName)` - Buffer layer
@@ -176,10 +177,12 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: Generates system prompts and defines available tools.
 
 **Key Functions**:
+
 - `generateSystemPrompt(query)` - Generate system prompt with context
 - `SPATIAL_TOOLS` - Array of available assistant tools
 
 **System Prompt Includes**:
+
 - Table name guard rules (use internal `tableName`, not user-facing names)
 - Tool routing guidance
 - DuckDB-WASM spatial SQL syntax
@@ -192,6 +195,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: Handles LLM API calls (OpenAI-compatible and Google AI).
 
 **Key Functions**:
+
 - `callLLM(options)` - Call LLM with messages and tools
 - Supports Google AI native format
 - Supports OpenAI-compatible endpoints
@@ -202,6 +206,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: React hook for AI assistant chat interface.
 
 **Key Features**:
+
 - Message history management
 - Tool call execution loop
 - Error handling with guidance
@@ -213,6 +218,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: React hook for Cloudflare Agents integration.
 
 **Key Features**:
+
 - Session token management
 - Agent connection with authentication
 - Tool call handling
@@ -223,6 +229,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: Generates database context for AI assistant.
 
 **Key Functions**:
+
 - `getDatabaseContext(query)` - Get optimized database context
 - `createConfiguredContext(config)` - Create configured context builder
 - `getLayerTableMappingContext()` - Get layer-to-table mapping
@@ -232,6 +239,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: Provisions AI-generated results for map display.
 
 **Key Functions**:
+
 - `provisionAIResult(tableName, sourceQuery, geometryCol, isExistingTable)` - Provision AI result with:
   - Geometry cleanup (ST_MakeValid, ST_Multi, ST_CollectionExtract)
   - R-Tree index creation
@@ -242,6 +250,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: Defines all available spatial tools.
 
 **Key Types**:
+
 - `SpatialToolId` - Tool identifiers
 - `ToolCategory` - Tool categories
 - `SpatialToolDefinition` - Tool definitions
@@ -253,6 +262,7 @@ This document provides complete context for AI agents working with the Mapryx co
 **Purpose**: Core TypeScript type definitions.
 
 **Key Types**:
+
 - `GeometryType` - Point, MultiPoint, LineString, etc.
 - `ServiceLayerType` - MVT, WMS, WFS, ESRI_FEATURE, etc.
 - `LayerConfig` - Layer configuration
@@ -267,17 +277,20 @@ This document provides complete context for AI agents working with the Mapryx co
 ## Core Architecture
 
 ### Data Flow
+
 ```
 User Input → LLM → Tool Calls → Executor → DuckDB-WASM → Results → UI
 ```
 
 ### Layer Management
+
 - Layers stored in `useLayerStore` (Zustand)
 - Each layer has: `id`, `name`, `visible`, `data`, `style`, `tableName`
 - Data stored in DuckDB-WASM with internal table names
 - Layers rendered via deck.gl with binary geometry format
 
 ### Spatial SQL Rules
+
 1. **Always use internal table names** (e.g., `table_geojson_123`)
 2. **Never use user-facing layer names** in SQL queries
 3. **Always alias geometry as `geom`**
@@ -285,6 +298,7 @@ User Input → LLM → Tool Calls → Executor → DuckDB-WASM → Results → U
 5. **ST_Transform requires 3 arguments**: `ST_Transform(geom, 'source', 'target')`
 
 ### Available Tools (24 total)
+
 1. `run_spatial_query` - Execute DuckDB SQL
 2. `select_layer` - Filter layer
 3. `buffer_layer` - Buffer features
@@ -314,6 +328,7 @@ User Input → LLM → Tool Calls → Executor → DuckDB-WASM → Results → U
 ## Development Setup
 
 ### Main Project
+
 ```bash
 cd /Users/abdulrehman/products/mapryx2
 npm install
@@ -321,6 +336,7 @@ npm run dev
 ```
 
 ### Agent Project
+
 ```bash
 cd /Users/abdulrehman/products/mapryx2/mapryx-agent
 npm install
@@ -328,7 +344,9 @@ npm run dev
 ```
 
 ### Agent Configuration
+
 The agent is configured via:
+
 - `mapryx-agent/wrangler.jsonc` - Worker configuration
 - `mapryx-agent/src/server.ts` - Agent logic
 - `mapryx-agent/src/app.tsx` - UI components
@@ -336,35 +354,43 @@ The agent is configured via:
 ## Integration Points
 
 ### 1. API Endpoint
+
 Agent exposes `/api/chat` endpoint for chat interactions.
 
 ### 2. Tool Execution
+
 Tools are executed via `onToolCall` callback in `useMapryxChatAgent`.
 
 ### 3. Authentication
+
 Agent uses Supabase session tokens for authentication.
 
 ### 4. Database Context
+
 Agent receives database context from `getDatabaseContext()` in main project.
 
 ## Testing
 
 ### Unit Tests
+
 ```bash
 npm test
 ```
 
 ### E2E Tests
+
 ```bash
 npx playwright test
 ```
 
 ### Linting
+
 ```bash
 npm run lint
 ```
 
 ### Build
+
 ```bash
 npm run build
 ```
@@ -372,13 +398,16 @@ npm run build
 ## Deployment
 
 ### Staging
+
 ```bash
 cd mapryx-agent
 npm run deploy
 ```
 
 ### Production
+
 Deploy via Cloudflare Workers with proper secrets:
+
 - `AGENT_ACCESS_PASSWORD`
 - `AGENT_SESSION_SECRET`
 - `AGENT_AUTH_TOKEN`

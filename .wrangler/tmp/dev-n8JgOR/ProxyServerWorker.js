@@ -1,5 +1,6 @@
 var __defProp = Object.defineProperty;
-var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __name = (target, value) =>
+  __defProp(target, "name", { value, configurable: true });
 
 // node_modules/@cloudflare/vite-plugin/node_modules/wrangler/wrangler-dist/ProxyServerWorker.js
 import * as cfw from "cloudflare:workers";
@@ -13,7 +14,7 @@ if (!Symbol.asyncDispose) {
   Symbol.asyncDispose = /* @__PURE__ */ Symbol.for("asyncDispose");
 }
 if (!Promise.withResolvers) {
-  Promise.withResolvers = function() {
+  Promise.withResolvers = function () {
     let resolve;
     let reject;
     const promise = new Promise((res, rej) => {
@@ -24,10 +25,8 @@ if (!Promise.withResolvers) {
   };
 }
 var workersModule = globalThis[WORKERS_MODULE_SYMBOL];
-var RpcTarget = workersModule ? workersModule.RpcTarget : class {
-};
-var AsyncFunction = (async function() {
-}).constructor;
+var RpcTarget = workersModule ? workersModule.RpcTarget : class {};
+var AsyncFunction = async function () {}.constructor;
 function typeForRpc(value) {
   switch (typeof value) {
     case "boolean":
@@ -78,9 +77,15 @@ function typeForRpc(value) {
     // TODO: Promise<T> or thenable
     default:
       if (workersModule) {
-        if (prototype == workersModule.RpcStub.prototype || value instanceof workersModule.ServiceStub) {
+        if (
+          prototype == workersModule.RpcStub.prototype ||
+          value instanceof workersModule.ServiceStub
+        ) {
           return "rpc-target";
-        } else if (prototype == workersModule.RpcPromise.prototype || prototype == workersModule.RpcProperty.prototype) {
+        } else if (
+          prototype == workersModule.RpcPromise.prototype ||
+          prototype == workersModule.RpcProperty.prototype
+        ) {
           return "rpc-thenable";
         }
       }
@@ -155,10 +160,8 @@ var ErrorStubHook = class extends StubHook {
   pull() {
     return Promise.reject(this.error);
   }
-  ignoreUnhandledRejections() {
-  }
-  dispose() {
-  }
+  ignoreUnhandledRejections() {}
+  dispose() {}
   onBroken(callback) {
     try {
       callback(this.error);
@@ -187,11 +190,14 @@ var RAW_STUB = /* @__PURE__ */ Symbol("realStub");
 var PROXY_HANDLERS = {
   apply(target, thisArg, argumentsList) {
     let stub = target.raw;
-    return new RpcPromise(doCall(
-      stub.hook,
-      stub.pathIfPromise || [],
-      RpcPayload.fromAppParams(argumentsList)
-    ), []);
+    return new RpcPromise(
+      doCall(
+        stub.hook,
+        stub.pathIfPromise || [],
+        RpcPayload.fromAppParams(argumentsList)
+      ),
+      []
+    );
   },
   get(target, prop, receiver) {
     let stub = target.raw;
@@ -204,7 +210,10 @@ var PROXY_HANDLERS = {
         stub.hook,
         stub.pathIfPromise ? [...stub.pathIfPromise, prop] : [prop]
       );
-    } else if (prop === Symbol.dispose && (!stub.pathIfPromise || stub.pathIfPromise.length == 0)) {
+    } else if (
+      prop === Symbol.dispose &&
+      (!stub.pathIfPromise || stub.pathIfPromise.length == 0)
+    ) {
       return () => {
         stub.hook.dispose();
         stub.hook = DISPOSED_HOOK;
@@ -221,7 +230,10 @@ var PROXY_HANDLERS = {
       return prop in stub;
     } else if (typeof prop === "string") {
       return true;
-    } else if (prop === Symbol.dispose && (!stub.pathIfPromise || stub.pathIfPromise.length == 0)) {
+    } else if (
+      prop === Symbol.dispose &&
+      (!stub.pathIfPromise || stub.pathIfPromise.length == 0)
+    ) {
       return true;
     } else {
       return false;
@@ -274,13 +286,14 @@ var RpcStub = class _RpcStub extends RpcTarget {
         hook = new PayloadStubHook(RpcPayload.fromAppReturn(value));
       }
       if (pathIfPromise) {
-        throw new TypeError("RpcStub constructor expected one argument, received two.");
+        throw new TypeError(
+          "RpcStub constructor expected one argument, received two."
+        );
       }
     }
     this.hook = hook;
     this.pathIfPromise = pathIfPromise;
-    let func = /* @__PURE__ */ __name(() => {
-    }, "func");
+    let func = /* @__PURE__ */ __name(() => {}, "func");
     func.raw = this;
     return new Proxy(func, PROXY_HANDLERS);
   }
@@ -573,7 +586,14 @@ var RpcPayload = class _RpcPayload {
         let len = array.length;
         let result = new Array(len);
         for (let i = 0; i < len; i++) {
-          result[i] = this.deepCopy(array[i], array, i, result, dupStubs, owner);
+          result[i] = this.deepCopy(
+            array[i],
+            array,
+            i,
+            result,
+            dupStubs,
+            owner
+          );
         }
         return result;
       }
@@ -581,7 +601,14 @@ var RpcPayload = class _RpcPayload {
         let result = {};
         let object = value;
         for (let i in object) {
-          result[i] = this.deepCopy(object[i], object, i, result, dupStubs, owner);
+          result[i] = this.deepCopy(
+            object[i],
+            object,
+            i,
+            result,
+            dupStubs,
+            owner
+          );
         }
         return result;
       }
@@ -619,9 +646,15 @@ var RpcPayload = class _RpcPayload {
         let target = value;
         let promise;
         if (owner) {
-          promise = new RpcPromise(owner.getHookForRpcTarget(target, oldParent, dupStubs), []);
+          promise = new RpcPromise(
+            owner.getHookForRpcTarget(target, oldParent, dupStubs),
+            []
+          );
         } else {
-          promise = new RpcPromise(TargetStubHook.create(target, oldParent), []);
+          promise = new RpcPromise(
+            TargetStubHook.create(target, oldParent),
+            []
+          );
         }
         this.promises.push({ parent, property, promise });
         return promise;
@@ -676,7 +709,14 @@ var RpcPayload = class _RpcPayload {
       this.hooks = [];
       this.promises = [];
       try {
-        this.value = this.deepCopy(this.value, void 0, "value", this, dupStubs, this);
+        this.value = this.deepCopy(
+          this.value,
+          void 0,
+          "value",
+          this,
+          dupStubs,
+          this
+        );
       } catch (err) {
         this.hooks = void 0;
         this.promises = void 0;
@@ -697,7 +737,12 @@ var RpcPayload = class _RpcPayload {
     } else {
       parent[property] = this.value;
       for (let record of this.promises) {
-        _RpcPayload.deliverRpcPromiseTo(record.promise, record.parent, record.property, promises);
+        _RpcPayload.deliverRpcPromiseTo(
+          record.promise,
+          record.parent,
+          record.property,
+          promises
+        );
       }
     }
   }
@@ -710,13 +755,15 @@ var RpcPayload = class _RpcPayload {
     if (inner instanceof _RpcPayload) {
       inner.deliverTo(parent, property, promises);
     } else {
-      promises.push(inner.then((payload) => {
-        let subPromises = [];
-        payload.deliverTo(parent, property, subPromises);
-        if (subPromises.length > 0) {
-          return Promise.all(subPromises);
-        }
-      }));
+      promises.push(
+        inner.then((payload) => {
+          let subPromises = [];
+          payload.deliverTo(parent, property, subPromises);
+          if (subPromises.length > 0) {
+            return Promise.all(subPromises);
+          }
+        })
+      );
     }
   }
   // Call the given function with the payload as an argument. The call is made synchronously if
@@ -786,9 +833,11 @@ var RpcPayload = class _RpcPayload {
     } else if (this.source === "return") {
       this.disposeImpl(this.value, void 0);
       if (this.rpcTargets && this.rpcTargets.size > 0) {
-        throw new Error("Not all rpcTargets were accounted for in disposeImpl()?");
+        throw new Error(
+          "Not all rpcTargets were accounted for in disposeImpl()?"
+        );
       }
-    } else ;
+    } else;
     this.source = "owned";
     this.hooks = [];
     this.promises = [];
@@ -889,8 +938,8 @@ var RpcPayload = class _RpcPayload {
       this.hooks.forEach((hook) => {
         hook.ignoreUnhandledRejections();
       });
-      this.promises.forEach(
-        (promise) => unwrapStubOrParent(promise.promise).ignoreUnhandledRejections()
+      this.promises.forEach((promise) =>
+        unwrapStubOrParent(promise.promise).ignoreUnhandledRejections()
       );
     } else {
       this.ignoreUnhandledRejectionsImpl(this.value);
@@ -934,9 +983,10 @@ var RpcPayload = class _RpcPayload {
         unwrapStubOrParent(value).ignoreUnhandledRejections();
         return;
       case "rpc-thenable":
-        value.then((_) => {
-        }, (_) => {
-        });
+        value.then(
+          (_) => {},
+          (_) => {}
+        );
         return;
       default:
         return;
@@ -983,7 +1033,12 @@ function followPath(value, parent, path, owner) {
       case "stub":
       case "rpc-promise": {
         let { hook, pathIfPromise } = unwrapStubAndPath(value);
-        return { hook, remainingPath: pathIfPromise ? pathIfPromise.concat(path.slice(i)) : path.slice(i) };
+        return {
+          hook,
+          remainingPath: pathIfPromise
+            ? pathIfPromise.concat(path.slice(i))
+            : path.slice(i)
+        };
       }
       case "writable":
         value = void 0;
@@ -1045,9 +1100,11 @@ var ValueStubHook = class extends StubHook {
         throw new TypeError(`'${path.join(".")}' is not a function.`);
       }
       let promise = args.deliverCall(followResult.value, followResult.parent);
-      return new PromiseStubHook(promise.then((payload) => {
-        return new PayloadStubHook(payload);
-      }));
+      return new PromiseStubHook(
+        promise.then((payload) => {
+          return new PayloadStubHook(payload);
+        })
+      );
     } catch (err) {
       return new ErrorStubHook(err);
     }
@@ -1058,7 +1115,6 @@ var ValueStubHook = class extends StubHook {
       try {
         let { value, owner } = this.getValue();
         followResult = followPath(value, void 0, path, owner);
-        ;
       } catch (err) {
         for (let cap of captures) {
           cap.dispose();
@@ -1066,7 +1122,11 @@ var ValueStubHook = class extends StubHook {
         throw err;
       }
       if (followResult.hook) {
-        return followResult.hook.map(followResult.remainingPath, captures, instructions);
+        return followResult.hook.map(
+          followResult.remainingPath,
+          captures,
+          instructions
+        );
       }
       return mapImpl.applyMap(
         followResult.value,
@@ -1089,11 +1149,13 @@ var ValueStubHook = class extends StubHook {
       if (followResult.hook) {
         return followResult.hook.get(followResult.remainingPath);
       }
-      return new PayloadStubHook(RpcPayload.deepCopyFrom(
-        followResult.value,
-        followResult.parent,
-        followResult.owner
-      ));
+      return new PayloadStubHook(
+        RpcPayload.deepCopyFrom(
+          followResult.value,
+          followResult.parent,
+          followResult.owner
+        )
+      );
     } catch (err) {
       return new ErrorStubHook(err);
     }
@@ -1113,7 +1175,9 @@ var PayloadStubHook = class _PayloadStubHook extends ValueStubHook {
     if (this.payload) {
       return this.payload;
     } else {
-      throw new Error("Attempted to use an RPC StubHook after it was disposed.");
+      throw new Error(
+        "Attempted to use an RPC StubHook after it was disposed."
+      );
     }
   }
   getValue() {
@@ -1122,11 +1186,9 @@ var PayloadStubHook = class _PayloadStubHook extends ValueStubHook {
   }
   dup() {
     let thisPayload = this.getPayload();
-    return new _PayloadStubHook(RpcPayload.deepCopyFrom(
-      thisPayload.value,
-      void 0,
-      thisPayload
-    ));
+    return new _PayloadStubHook(
+      RpcPayload.deepCopyFrom(thisPayload.value, void 0, thisPayload)
+    );
   }
   pull() {
     return this.getPayload();
@@ -1196,7 +1258,9 @@ var TargetStubHook = class _TargetStubHook extends ValueStubHook {
     if (this.target) {
       return this.target;
     } else {
-      throw new Error("Attempted to use an RPC StubHook after it was disposed.");
+      throw new Error(
+        "Attempted to use an RPC StubHook after it was disposed."
+      );
     }
   }
   getValue() {
@@ -1215,8 +1279,7 @@ var TargetStubHook = class _TargetStubHook extends ValueStubHook {
       return Promise.reject(new Error("Tried to resolve a non-promise stub."));
     }
   }
-  ignoreUnhandledRejections() {
-  }
+  ignoreUnhandledRejections() {}
   dispose() {
     if (this.target) {
       if (this.refcount) {
@@ -1227,8 +1290,7 @@ var TargetStubHook = class _TargetStubHook extends ValueStubHook {
       this.target = void 0;
     }
   }
-  onBroken(callback) {
-  }
+  onBroken(callback) {}
 };
 var PromiseStubHook = class _PromiseStubHook extends StubHook {
   static {
@@ -1245,7 +1307,9 @@ var PromiseStubHook = class _PromiseStubHook extends StubHook {
   }
   call(path, args) {
     args.ensureDeepCopied();
-    return new _PromiseStubHook(this.promise.then((hook) => hook.call(path, args)));
+    return new _PromiseStubHook(
+      this.promise.then((hook) => hook.call(path, args))
+    );
   }
   stream(path, args) {
     args.ensureDeepCopied();
@@ -1256,15 +1320,17 @@ var PromiseStubHook = class _PromiseStubHook extends StubHook {
     return { promise };
   }
   map(path, captures, instructions) {
-    return new _PromiseStubHook(this.promise.then(
-      (hook) => hook.map(path, captures, instructions),
-      (err) => {
-        for (let cap of captures) {
-          cap.dispose();
+    return new _PromiseStubHook(
+      this.promise.then(
+        (hook) => hook.map(path, captures, instructions),
+        (err) => {
+          for (let cap of captures) {
+            cap.dispose();
+          }
+          throw err;
         }
-        throw err;
-      }
-    ));
+      )
+    );
   }
   get(path) {
     return new _PromiseStubHook(this.promise.then((hook) => hook.get(path)));
@@ -1287,20 +1353,24 @@ var PromiseStubHook = class _PromiseStubHook extends StubHook {
     if (this.resolution) {
       this.resolution.ignoreUnhandledRejections();
     } else {
-      this.promise.then((res) => {
-        res.ignoreUnhandledRejections();
-      }, (err) => {
-      });
+      this.promise.then(
+        (res) => {
+          res.ignoreUnhandledRejections();
+        },
+        (err) => {}
+      );
     }
   }
   dispose() {
     if (this.resolution) {
       this.resolution.dispose();
     } else {
-      this.promise.then((hook) => {
-        hook.dispose();
-      }, (err) => {
-      });
+      this.promise.then(
+        (hook) => {
+          hook.dispose();
+        },
+        (err) => {}
+      );
     }
   }
   onBroken(callback) {
@@ -1326,13 +1396,11 @@ var NullExporter = class {
   getImport(hook) {
     return void 0;
   }
-  unexport(ids) {
-  }
+  unexport(ids) {}
   createPipe(readable) {
     throw new Error("Cannot create pipes without an RPC session.");
   }
-  onSendError(error) {
-  }
+  onSendError(error) {}
 };
 var NULL_EXPORTER = new NullExporter();
 var ERROR_TYPES = {
@@ -1370,8 +1438,7 @@ var Devaluator = class _Devaluator {
       if (devaluator.exports) {
         try {
           exporter.unexport(devaluator.exports);
-        } catch (err2) {
-        }
+        } catch (err2) {}
       }
       throw err;
     }
@@ -1451,7 +1518,10 @@ var Devaluator = class _Devaluator {
         if (req.body) {
           init.body = this.devaluateImpl(req.body, req, depth + 1);
           init.duplex = req.duplex || "half";
-        } else if (req.body === void 0 && !["GET", "HEAD", "OPTIONS", "TRACE", "DELETE"].includes(req.method)) {
+        } else if (
+          req.body === void 0 &&
+          !["GET", "HEAD", "OPTIONS", "TRACE", "DELETE"].includes(req.method)
+        ) {
           let bodyPromise = req.arrayBuffer();
           let readable = new ReadableStream({
             async start(controller) {
@@ -1475,12 +1545,16 @@ var Devaluator = class _Devaluator {
         if (req.credentials && req.credentials !== "same-origin") {
           init.credentials = req.credentials;
         }
-        if (req.referrer && req.referrer !== "about:client") init.referrer = req.referrer;
+        if (req.referrer && req.referrer !== "about:client")
+          init.referrer = req.referrer;
         if (req.referrerPolicy) init.referrerPolicy = req.referrerPolicy;
         if (req.keepalive) init.keepalive = req.keepalive;
         let cfReq = req;
         if (cfReq.cf) init.cf = cfReq.cf;
-        if (cfReq.encodeResponseBody && cfReq.encodeResponseBody !== "automatic") {
+        if (
+          cfReq.encodeResponseBody &&
+          cfReq.encodeResponseBody !== "automatic"
+        ) {
           init.encodeResponseBody = cfReq.encodeResponseBody;
         }
         return ["request", req.url, init];
@@ -1501,7 +1575,9 @@ var Devaluator = class _Devaluator {
           init.encodeBody = cfResp.encodeBody;
         }
         if (cfResp.webSocket) {
-          throw new TypeError("Can't serialize a Response containing a webSocket.");
+          throw new TypeError(
+            "Can't serialize a Response containing a webSocket."
+          );
         }
         return ["response", body, init];
       }
@@ -1581,7 +1657,10 @@ var Devaluator = class _Devaluator {
   }
   devaluateHook(type, hook) {
     if (!this.exports) this.exports = [];
-    let exportId = type === "promise" ? this.exporter.exportPromise(hook) : this.exporter.exportStub(hook);
+    let exportId =
+      type === "promise"
+        ? this.exporter.exportPromise(hook)
+        : this.exporter.exportStub(hook);
     this.exports.push(exportId);
     return [type, exportId];
   }
@@ -1644,227 +1723,267 @@ var Evaluator = class _Evaluator {
           result[i] = this.evaluateImpl(result[i], result, i);
         }
         return result;
-      } else switch (value[0]) {
-        case "bigint":
-          if (typeof value[1] == "string") {
-            return BigInt(value[1]);
-          }
-          break;
-        case "date":
-          if (typeof value[1] == "number") {
-            return new Date(value[1]);
-          }
-          break;
-        case "bytes": {
-          let b64 = Uint8Array;
-          if (typeof value[1] == "string") {
-            if (b64.fromBase64) {
-              return b64.fromBase64(value[1]);
-            } else {
-              let bs = atob(value[1]);
-              let len = bs.length;
-              let bytes = new Uint8Array(len);
-              for (let i = 0; i < len; i++) {
-                bytes[i] = bs.charCodeAt(i);
+      } else
+        switch (value[0]) {
+          case "bigint":
+            if (typeof value[1] == "string") {
+              return BigInt(value[1]);
+            }
+            break;
+          case "date":
+            if (typeof value[1] == "number") {
+              return new Date(value[1]);
+            }
+            break;
+          case "bytes": {
+            let b64 = Uint8Array;
+            if (typeof value[1] == "string") {
+              if (b64.fromBase64) {
+                return b64.fromBase64(value[1]);
+              } else {
+                let bs = atob(value[1]);
+                let len = bs.length;
+                let bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                  bytes[i] = bs.charCodeAt(i);
+                }
+                return bytes;
               }
-              return bytes;
             }
-          }
-          break;
-        }
-        case "error":
-          if (value.length >= 3 && typeof value[1] === "string" && typeof value[2] === "string") {
-            let cls = ERROR_TYPES[value[1]] || Error;
-            let result = new cls(value[2]);
-            if (typeof value[3] === "string") {
-              result.stack = value[3];
-            }
-            return result;
-          }
-          break;
-        case "undefined":
-          if (value.length === 1) {
-            return void 0;
-          }
-          break;
-        case "inf":
-          return Infinity;
-        case "-inf":
-          return -Infinity;
-        case "nan":
-          return NaN;
-        case "headers":
-          if (value.length === 2 && value[1] instanceof Array) {
-            return new Headers(value[1]);
-          }
-          break;
-        case "request": {
-          if (value.length !== 3 || typeof value[1] !== "string") break;
-          let url = value[1];
-          let init = value[2];
-          if (typeof init !== "object" || init === null) break;
-          if (init.body) {
-            init.body = this.evaluateImpl(init.body, init, "body");
-            if (init.body === null || typeof init.body === "string" || init.body instanceof Uint8Array || init.body instanceof ReadableStream) ;
-            else {
-              throw new TypeError("Request body must be of type ReadableStream.");
-            }
-          }
-          if (init.signal) {
-            init.signal = this.evaluateImpl(init.signal, init, "signal");
-            if (!(init.signal instanceof AbortSignal)) {
-              throw new TypeError("Request siganl must be of type AbortSignal.");
-            }
-          }
-          if (init.headers && !(init.headers instanceof Array)) {
-            throw new TypeError("Request headers must be serialized as an array of pairs.");
-          }
-          let result = new Request(url, init);
-          if (init.body instanceof ReadableStream && result.body === void 0) {
-            let promise = fixBrokenRequestBody(result, init.body);
-            this.promises.push({ promise, parent, property });
-            return promise;
-          } else {
-            return result;
-          }
-        }
-        case "response": {
-          if (value.length !== 3) break;
-          let body = this.evaluateImpl(value[1], parent, property);
-          if (body === null || typeof body === "string" || body instanceof Uint8Array || body instanceof ReadableStream) ;
-          else {
-            throw new TypeError("Response body must be of type ReadableStream.");
-          }
-          let init = value[2];
-          if (typeof init !== "object" || init === null) break;
-          if (init.webSocket) {
-            throw new TypeError("Can't deserialize a Response containing a webSocket.");
-          }
-          if (init.headers && !(init.headers instanceof Array)) {
-            throw new TypeError("Request headers must be serialized as an array of pairs.");
-          }
-          return new Response(body, init);
-        }
-        case "import":
-        case "pipeline": {
-          if (value.length < 2 || value.length > 4) {
             break;
           }
-          if (typeof value[1] != "number") {
+          case "error":
+            if (
+              value.length >= 3 &&
+              typeof value[1] === "string" &&
+              typeof value[2] === "string"
+            ) {
+              let cls = ERROR_TYPES[value[1]] || Error;
+              let result = new cls(value[2]);
+              if (typeof value[3] === "string") {
+                result.stack = value[3];
+              }
+              return result;
+            }
             break;
-          }
-          let hook = this.importer.getExport(value[1]);
-          if (!hook) {
-            throw new Error(`no such entry on exports table: ${value[1]}`);
-          }
-          let isPromise = value[0] == "pipeline";
-          let addStub = /* @__PURE__ */ __name((hook2) => {
-            if (isPromise) {
-              let promise = new RpcPromise(hook2, []);
+          case "undefined":
+            if (value.length === 1) {
+              return void 0;
+            }
+            break;
+          case "inf":
+            return Infinity;
+          case "-inf":
+            return -Infinity;
+          case "nan":
+            return NaN;
+          case "headers":
+            if (value.length === 2 && value[1] instanceof Array) {
+              return new Headers(value[1]);
+            }
+            break;
+          case "request": {
+            if (value.length !== 3 || typeof value[1] !== "string") break;
+            let url = value[1];
+            let init = value[2];
+            if (typeof init !== "object" || init === null) break;
+            if (init.body) {
+              init.body = this.evaluateImpl(init.body, init, "body");
+              if (
+                init.body === null ||
+                typeof init.body === "string" ||
+                init.body instanceof Uint8Array ||
+                init.body instanceof ReadableStream
+              );
+              else {
+                throw new TypeError(
+                  "Request body must be of type ReadableStream."
+                );
+              }
+            }
+            if (init.signal) {
+              init.signal = this.evaluateImpl(init.signal, init, "signal");
+              if (!(init.signal instanceof AbortSignal)) {
+                throw new TypeError(
+                  "Request siganl must be of type AbortSignal."
+                );
+              }
+            }
+            if (init.headers && !(init.headers instanceof Array)) {
+              throw new TypeError(
+                "Request headers must be serialized as an array of pairs."
+              );
+            }
+            let result = new Request(url, init);
+            if (init.body instanceof ReadableStream && result.body === void 0) {
+              let promise = fixBrokenRequestBody(result, init.body);
               this.promises.push({ promise, parent, property });
               return promise;
             } else {
-              this.hooks.push(hook2);
-              return new RpcPromise(hook2, []);
-            }
-          }, "addStub");
-          if (value.length == 2) {
-            if (isPromise) {
-              return addStub(hook.get([]));
-            } else {
-              return addStub(hook.dup());
+              return result;
             }
           }
-          let path = value[2];
-          if (!(path instanceof Array)) {
-            break;
-          }
-          if (!path.every(
-            (part) => {
-              return typeof part == "string" || typeof part == "number";
+          case "response": {
+            if (value.length !== 3) break;
+            let body = this.evaluateImpl(value[1], parent, property);
+            if (
+              body === null ||
+              typeof body === "string" ||
+              body instanceof Uint8Array ||
+              body instanceof ReadableStream
+            );
+            else {
+              throw new TypeError(
+                "Response body must be of type ReadableStream."
+              );
             }
-          )) {
-            break;
-          }
-          if (value.length == 3) {
-            return addStub(hook.get(path));
-          }
-          let args = value[3];
-          if (!(args instanceof Array)) {
-            break;
-          }
-          let subEval = new _Evaluator(this.importer);
-          args = subEval.evaluate([args]);
-          return addStub(hook.call(path, args));
-        }
-        case "remap": {
-          if (value.length !== 5 || typeof value[1] !== "number" || !(value[2] instanceof Array) || !(value[3] instanceof Array) || !(value[4] instanceof Array)) {
-            break;
-          }
-          let hook = this.importer.getExport(value[1]);
-          if (!hook) {
-            throw new Error(`no such entry on exports table: ${value[1]}`);
-          }
-          let path = value[2];
-          if (!path.every(
-            (part) => {
-              return typeof part == "string" || typeof part == "number";
+            let init = value[2];
+            if (typeof init !== "object" || init === null) break;
+            if (init.webSocket) {
+              throw new TypeError(
+                "Can't deserialize a Response containing a webSocket."
+              );
             }
-          )) {
-            break;
-          }
-          let captures = value[3].map((cap) => {
-            if (!(cap instanceof Array) || cap.length !== 2 || cap[0] !== "import" && cap[0] !== "export" || typeof cap[1] !== "number") {
-              throw new TypeError(`unknown map capture: ${JSON.stringify(cap)}`);
+            if (init.headers && !(init.headers instanceof Array)) {
+              throw new TypeError(
+                "Request headers must be serialized as an array of pairs."
+              );
             }
-            if (cap[0] === "export") {
-              return this.importer.importStub(cap[1]);
-            } else {
-              let exp = this.importer.getExport(cap[1]);
-              if (!exp) {
-                throw new Error(`no such entry on exports table: ${cap[1]}`);
+            return new Response(body, init);
+          }
+          case "import":
+          case "pipeline": {
+            if (value.length < 2 || value.length > 4) {
+              break;
+            }
+            if (typeof value[1] != "number") {
+              break;
+            }
+            let hook = this.importer.getExport(value[1]);
+            if (!hook) {
+              throw new Error(`no such entry on exports table: ${value[1]}`);
+            }
+            let isPromise = value[0] == "pipeline";
+            let addStub = /* @__PURE__ */ __name((hook2) => {
+              if (isPromise) {
+                let promise = new RpcPromise(hook2, []);
+                this.promises.push({ promise, parent, property });
+                return promise;
+              } else {
+                this.hooks.push(hook2);
+                return new RpcPromise(hook2, []);
               }
-              return exp.dup();
+            }, "addStub");
+            if (value.length == 2) {
+              if (isPromise) {
+                return addStub(hook.get([]));
+              } else {
+                return addStub(hook.dup());
+              }
             }
-          });
-          let instructions = value[4];
-          let resultHook = hook.map(path, captures, instructions);
-          let promise = new RpcPromise(resultHook, []);
-          this.promises.push({ promise, parent, property });
-          return promise;
-        }
-        case "export":
-        case "promise":
-          if (typeof value[1] == "number") {
-            if (value[0] == "promise") {
-              let hook = this.importer.importPromise(value[1]);
-              let promise = new RpcPromise(hook, []);
-              this.promises.push({ parent, property, promise });
-              return promise;
-            } else {
+            let path = value[2];
+            if (!(path instanceof Array)) {
+              break;
+            }
+            if (
+              !path.every((part) => {
+                return typeof part == "string" || typeof part == "number";
+              })
+            ) {
+              break;
+            }
+            if (value.length == 3) {
+              return addStub(hook.get(path));
+            }
+            let args = value[3];
+            if (!(args instanceof Array)) {
+              break;
+            }
+            let subEval = new _Evaluator(this.importer);
+            args = subEval.evaluate([args]);
+            return addStub(hook.call(path, args));
+          }
+          case "remap": {
+            if (
+              value.length !== 5 ||
+              typeof value[1] !== "number" ||
+              !(value[2] instanceof Array) ||
+              !(value[3] instanceof Array) ||
+              !(value[4] instanceof Array)
+            ) {
+              break;
+            }
+            let hook = this.importer.getExport(value[1]);
+            if (!hook) {
+              throw new Error(`no such entry on exports table: ${value[1]}`);
+            }
+            let path = value[2];
+            if (
+              !path.every((part) => {
+                return typeof part == "string" || typeof part == "number";
+              })
+            ) {
+              break;
+            }
+            let captures = value[3].map((cap) => {
+              if (
+                !(cap instanceof Array) ||
+                cap.length !== 2 ||
+                (cap[0] !== "import" && cap[0] !== "export") ||
+                typeof cap[1] !== "number"
+              ) {
+                throw new TypeError(
+                  `unknown map capture: ${JSON.stringify(cap)}`
+                );
+              }
+              if (cap[0] === "export") {
+                return this.importer.importStub(cap[1]);
+              } else {
+                let exp = this.importer.getExport(cap[1]);
+                if (!exp) {
+                  throw new Error(`no such entry on exports table: ${cap[1]}`);
+                }
+                return exp.dup();
+              }
+            });
+            let instructions = value[4];
+            let resultHook = hook.map(path, captures, instructions);
+            let promise = new RpcPromise(resultHook, []);
+            this.promises.push({ promise, parent, property });
+            return promise;
+          }
+          case "export":
+          case "promise":
+            if (typeof value[1] == "number") {
+              if (value[0] == "promise") {
+                let hook = this.importer.importPromise(value[1]);
+                let promise = new RpcPromise(hook, []);
+                this.promises.push({ parent, property, promise });
+                return promise;
+              } else {
+                let hook = this.importer.importStub(value[1]);
+                this.hooks.push(hook);
+                return new RpcStub(hook);
+              }
+            }
+            break;
+          case "writable":
+            if (typeof value[1] == "number") {
               let hook = this.importer.importStub(value[1]);
+              let stream = streamImpl.createWritableStreamFromHook(hook);
               this.hooks.push(hook);
-              return new RpcStub(hook);
+              return stream;
             }
-          }
-          break;
-        case "writable":
-          if (typeof value[1] == "number") {
-            let hook = this.importer.importStub(value[1]);
-            let stream = streamImpl.createWritableStreamFromHook(hook);
-            this.hooks.push(hook);
-            return stream;
-          }
-          break;
-        case "readable":
-          if (typeof value[1] == "number") {
-            let stream = this.importer.getPipeReadable(value[1]);
-            let hook = streamImpl.createReadableStreamHook(stream);
-            this.hooks.push(hook);
-            return stream;
-          }
-          break;
-      }
+            break;
+          case "readable":
+            if (typeof value[1] == "number") {
+              let stream = this.importer.getPipeReadable(value[1]);
+              let hook = streamImpl.createReadableStreamHook(stream);
+              this.hooks.push(hook);
+              return stream;
+            }
+            break;
+        }
       throw new TypeError(`unknown special value: ${JSON.stringify(value)}`);
     } else if (value instanceof Object) {
       let result = value;
@@ -1937,7 +2056,9 @@ var ImportTableEntry = class {
     if (this.resolution) {
       this.resolution.dispose();
     } else {
-      this.abort(new Error("RPC was canceled because the RpcPromise was disposed."));
+      this.abort(
+        new Error("RPC was canceled because the RpcPromise was disposed.")
+      );
       this.sendRelease();
     }
   }
@@ -2023,7 +2144,12 @@ var RpcImportHook = class _RpcImportHook extends StubHook {
     if (entry.resolution) {
       return entry.resolution.map(path, captures, instructions);
     } else {
-      return entry.session.sendMap(entry.importId, path, captures, instructions);
+      return entry.session.sendMap(
+        entry.importId,
+        path,
+        captures,
+        instructions
+      );
     }
   }
   get(path) {
@@ -2047,8 +2173,7 @@ var RpcImportHook = class _RpcImportHook extends StubHook {
     }
     return entry.awaitResolution();
   }
-  ignoreUnhandledRejections() {
-  }
+  ignoreUnhandledRejections() {}
   dispose() {
     let entry = this.entry;
     this.entry = void 0;
@@ -2118,7 +2243,10 @@ var RpcSessionImpl = class {
     return new RpcMainHook(this.imports[0]);
   }
   shutdown() {
-    this.abort(new Error("RPC session was shut down by disposing the main stub"), false);
+    this.abort(
+      new Error("RPC session was shut down by disposing the main stub"),
+      false
+    );
   }
   exportStub(hook) {
     if (this.abortReason) throw this.abortReason;
@@ -2152,7 +2280,9 @@ var RpcSessionImpl = class {
       throw new Error(`no such export ID: ${exportId}`);
     }
     if (entry.refcount < refcount) {
-      throw new Error(`refcount would go negative: ${entry.refcount} < ${refcount}`);
+      throw new Error(
+        `refcount would go negative: ${entry.refcount} < ${refcount}`
+      );
     }
     entry.refcount -= refcount;
     if (entry.refcount === 0) {
@@ -2174,10 +2304,12 @@ var RpcSessionImpl = class {
     if (!exp.pull) {
       let resolve = /* @__PURE__ */ __name(async () => {
         let hook = exp.hook;
-        for (; ; ) {
+        for (;;) {
           let payload = await hook.pull();
           if (payload.value instanceof RpcStub) {
-            let { hook: inner, pathIfPromise } = unwrapStubAndPath(payload.value);
+            let { hook: inner, pathIfPromise } = unwrapStubAndPath(
+              payload.value
+            );
             if (pathIfPromise && pathIfPromise.length == 0) {
               if (this.getImport(hook) === void 0) {
                 hook = inner;
@@ -2190,36 +2322,54 @@ var RpcSessionImpl = class {
       }, "resolve");
       let autoRelease = exp.autoRelease;
       ++this.pullCount;
-      exp.pull = resolve().then(
-        (payload) => {
-          let value = Devaluator.devaluate(payload.value, void 0, this, payload);
-          this.send(["resolve", exportId, value]);
-          if (autoRelease) this.releaseExport(exportId, 1);
-        },
-        (error) => {
-          this.send(["reject", exportId, Devaluator.devaluate(error, void 0, this)]);
-          if (autoRelease) this.releaseExport(exportId, 1);
-        }
-      ).catch(
-        (error) => {
+      exp.pull = resolve()
+        .then(
+          (payload) => {
+            let value = Devaluator.devaluate(
+              payload.value,
+              void 0,
+              this,
+              payload
+            );
+            this.send(["resolve", exportId, value]);
+            if (autoRelease) this.releaseExport(exportId, 1);
+          },
+          (error) => {
+            this.send([
+              "reject",
+              exportId,
+              Devaluator.devaluate(error, void 0, this)
+            ]);
+            if (autoRelease) this.releaseExport(exportId, 1);
+          }
+        )
+        .catch((error) => {
           try {
-            this.send(["reject", exportId, Devaluator.devaluate(error, void 0, this)]);
+            this.send([
+              "reject",
+              exportId,
+              Devaluator.devaluate(error, void 0, this)
+            ]);
             if (autoRelease) this.releaseExport(exportId, 1);
           } catch (error2) {
             this.abort(error2);
           }
-        }
-      ).finally(() => {
-        if (--this.pullCount === 0) {
-          if (this.onBatchDone) {
-            this.onBatchDone.resolve();
+        })
+        .finally(() => {
+          if (--this.pullCount === 0) {
+            if (this.onBatchDone) {
+              this.onBatchDone.resolve();
+            }
           }
-        }
-      });
+        });
     }
   }
   getImport(hook) {
-    if (hook instanceof RpcImportHook && hook.entry && hook.entry.session === this) {
+    if (
+      hook instanceof RpcImportHook &&
+      hook.entry &&
+      hook.entry.session === this
+    ) {
       return hook.entry.importId;
     } else {
       return void 0;
@@ -2241,9 +2391,11 @@ var RpcSessionImpl = class {
   importPromise(idx) {
     if (this.abortReason) throw this.abortReason;
     if (this.imports[idx]) {
-      return new ErrorStubHook(new Error(
-        "Bug in RPC system: The peer sent a promise reusing an existing export ID."
-      ));
+      return new ErrorStubHook(
+        new Error(
+          "Bug in RPC system: The peer sent a promise reusing an existing export ID."
+        )
+      );
     }
     let entry = new ImportTableEntry(this, idx, true);
     this.imports[idx] = entry;
@@ -2259,7 +2411,9 @@ var RpcSessionImpl = class {
   getPipeReadable(exportId) {
     let entry = this.exports[exportId];
     if (!entry || !entry.pipeReadable) {
-      throw new Error(`Export ${exportId} is not a pipe or its readable end was already consumed.`);
+      throw new Error(
+        `Export ${exportId} is not a pipe or its readable end was already consumed.`
+      );
     }
     let readable = entry.pipeReadable;
     entry.pipeReadable = void 0;
@@ -2277,8 +2431,10 @@ var RpcSessionImpl = class {
       entry
     );
     let writable = streamImpl.createWritableStreamFromHook(hook);
-    readable.pipeTo(writable).catch(() => {
-    }).finally(() => readableHook.dispose());
+    readable
+      .pipeTo(writable)
+      .catch(() => {})
+      .finally(() => readableHook.dispose());
     return importId;
   }
   // Serializes and sends a message. Returns the byte length of the serialized message.
@@ -2292,8 +2448,7 @@ var RpcSessionImpl = class {
     } catch (err) {
       try {
         this.abort(err);
-      } catch (err2) {
-      }
+      } catch (err2) {}
       throw err;
     }
     this.transport.send(msgText).catch((err) => this.abort(err, false));
@@ -2382,10 +2537,12 @@ var RpcSessionImpl = class {
     this.cancelReadLoop(error);
     if (trySendAbortMessage) {
       try {
-        this.transport.send(JSON.stringify(["abort", Devaluator.devaluate(error, void 0, this)])).catch((err) => {
-        });
-      } catch (err) {
-      }
+        this.transport
+          .send(
+            JSON.stringify(["abort", Devaluator.devaluate(error, void 0, this)])
+          )
+          .catch((err) => {});
+      } catch (err) {}
     }
     if (error === void 0) {
       error = "undefined";
@@ -2417,7 +2574,9 @@ var RpcSessionImpl = class {
   }
   async readLoop(abortPromise) {
     while (!this.abortReason) {
-      let msg = JSON.parse(await Promise.race([this.transport.receive(), abortPromise]));
+      let msg = JSON.parse(
+        await Promise.race([this.transport.receive(), abortPromise])
+      );
       if (this.abortReason) break;
       if (msg instanceof Array) {
         switch (msg[0]) {
@@ -2464,7 +2623,9 @@ var RpcSessionImpl = class {
               let imp = this.imports[importId];
               if (imp) {
                 if (msg[0] == "resolve") {
-                  imp.resolve(new PayloadStubHook(new Evaluator(this).evaluate(msg[2])));
+                  imp.resolve(
+                    new PayloadStubHook(new Evaluator(this).evaluate(msg[2]))
+                  );
                 } else {
                   let payload = new Evaluator(this).evaluate(msg[2]);
                   payload.dispose();
@@ -2531,7 +2692,9 @@ var RpcSession = class {
     if (localMain) {
       mainHook = new PayloadStubHook(RpcPayload.fromAppReturn(localMain));
     } else {
-      mainHook = new ErrorStubHook(new Error("This connection has no main object."));
+      mainHook = new ErrorStubHook(
+        new Error("This connection has no main object.")
+      );
     }
     this.#session = new RpcSessionImpl(transport, mainHook, options);
     this.#mainStub = new RpcStub(this.#session.getMainImport());
@@ -2557,7 +2720,9 @@ function newWebSocketRpcSession(webSocket, localMain, options) {
 __name(newWebSocketRpcSession, "newWebSocketRpcSession");
 function newWorkersWebSocketRpcResponse(request, localMain, options) {
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
-    return new Response("This endpoint only accepts WebSocket requests.", { status: 400 });
+    return new Response("This endpoint only accepts WebSocket requests.", {
+      status: 400
+    });
   }
   let pair = new WebSocketPair();
   let server = pair[0];
@@ -2589,7 +2754,7 @@ var WebSocketTransport = class {
       });
     }
     webSocket.addEventListener("message", (event) => {
-      if (this.#error) ;
+      if (this.#error);
       else if (typeof event.data === "string") {
         if (this.#receiveResolver) {
           this.#receiveResolver(event.data);
@@ -2599,11 +2764,15 @@ var WebSocketTransport = class {
           this.#receiveQueue.push(event.data);
         }
       } else {
-        this.#receivedError(new TypeError("Received non-string message from WebSocket."));
+        this.#receivedError(
+          new TypeError("Received non-string message from WebSocket.")
+        );
       }
     });
     webSocket.addEventListener("close", (event) => {
-      this.#receivedError(new Error(`Peer closed WebSocket: ${event.code} ${event.reason}`));
+      this.#receivedError(
+        new Error(`Peer closed WebSocket: ${event.code} ${event.reason}`)
+      );
     });
     webSocket.addEventListener("error", (event) => {
       this.#receivedError(new Error(`WebSocket connection failed.`));
@@ -2677,8 +2846,7 @@ var BatchServerTransport = class {
       return msg;
     } else {
       this.#allReceived.resolve();
-      return new Promise((r) => {
-      });
+      return new Promise((r) => {});
     }
   }
   abort(reason) {
@@ -2693,7 +2861,9 @@ var BatchServerTransport = class {
 };
 async function newHttpBatchRpcResponse(request, localMain, options) {
   if (request.method !== "POST") {
-    return new Response("This endpoint only accepts POST requests.", { status: 405 });
+    return new Response("This endpoint only accepts POST requests.", {
+      status: 405
+    });
   }
   let body = await request.text();
   let batch = body === "" ? [] : body.split("\n");
@@ -2745,18 +2915,23 @@ var MapBuilder = class {
     }
     this.instructions.push(devalued);
     if (this.context.parent) {
-      this.context.parent.instructions.push(
-        [
-          "remap",
-          this.context.subject,
-          this.context.path,
-          this.context.captures.map((cap) => ["import", cap]),
-          this.instructions
-        ]
+      this.context.parent.instructions.push([
+        "remap",
+        this.context.subject,
+        this.context.path,
+        this.context.captures.map((cap) => ["import", cap]),
+        this.instructions
+      ]);
+      return new MapVariableHook(
+        this.context.parent,
+        this.context.parent.instructions.length
       );
-      return new MapVariableHook(this.context.parent, this.context.parent.instructions.length);
     } else {
-      return this.context.subject.map(this.context.path, this.context.captures, this.instructions);
+      return this.context.subject.map(
+        this.context.path,
+        this.context.captures,
+        this.instructions
+      );
     }
   }
   pushCall(hook, path, params) {
@@ -2801,27 +2976,26 @@ var MapBuilder = class {
   getImport(hook) {
     return this.capture(hook);
   }
-  unexport(ids) {
-  }
+  unexport(ids) {}
   createPipe(readable) {
     throw new Error("Cannot send ReadableStream inside a mapper function.");
   }
-  onSendError(error) {
-  }
+  onSendError(error) {}
 };
 mapImpl.sendMap = (hook, path, func) => {
   let builder = new MapBuilder(hook, path);
   let result;
   try {
-    result = RpcPayload.fromAppReturn(withCallInterceptor(builder.pushCall.bind(builder), () => {
-      return func(new RpcPromise(builder.makeInput(), []));
-    }));
+    result = RpcPayload.fromAppReturn(
+      withCallInterceptor(builder.pushCall.bind(builder), () => {
+        return func(new RpcPromise(builder.makeInput(), []));
+      })
+    );
   } finally {
     builder.unregister();
   }
   if (result instanceof Promise) {
-    result.catch((err) => {
-    });
+    result.catch((err) => {});
     throw new Error("RPC map() callbacks cannot be async.");
   }
   return new RpcPromise(builder.makeOutput(result), []);
@@ -2845,8 +3019,7 @@ var MapVariableHook = class extends StubHook {
   dup() {
     return this;
   }
-  dispose() {
-  }
+  dispose() {}
   get(path) {
     if (path.length == 0) {
       return this;
@@ -2866,8 +3039,7 @@ var MapVariableHook = class extends StubHook {
   pull() {
     throwMapperBuilderUseError();
   }
-  ignoreUnhandledRejections() {
-  }
+  ignoreUnhandledRejections() {}
   onBroken(callback) {
     throwMapperBuilderUseError();
   }
@@ -2902,7 +3074,9 @@ var MapApplicator = class {
         }
         this.variables.push(new PayloadStubHook(payload));
       }
-      return new Evaluator(this).evaluateCopy(instructions[instructions.length - 1]);
+      return new Evaluator(this).evaluateCopy(
+        instructions[instructions.length - 1]
+      );
     } finally {
       for (let variable of this.variables) {
         variable.dispose();
@@ -2927,7 +3101,9 @@ var MapApplicator = class {
   }
 };
 function applyMapToElement(input, parent, owner, captures, instructions) {
-  let inputHook = new PayloadStubHook(RpcPayload.deepCopyFrom(input, parent, owner));
+  let inputHook = new PayloadStubHook(
+    RpcPayload.deepCopyFrom(input, parent, owner)
+  );
   let mapper = new MapApplicator(captures, inputHook);
   try {
     return mapper.apply(instructions);
@@ -2945,7 +3121,9 @@ mapImpl.applyMap = (input, parent, owner, captures, instructions) => {
       let payloads = [];
       try {
         for (let elem of input) {
-          payloads.push(applyMapToElement(elem, input, owner, captures, instructions));
+          payloads.push(
+            applyMapToElement(elem, input, owner, captures, instructions)
+          );
         }
       } catch (err) {
         for (let payload of payloads) {
@@ -2988,14 +3166,18 @@ var WritableStreamStubHook = class _WritableStreamStubHook extends StubHook {
     if (this.state) {
       return this.state;
     } else {
-      throw new Error("Attempted to use a WritableStreamStubHook after it was disposed.");
+      throw new Error(
+        "Attempted to use a WritableStreamStubHook after it was disposed."
+      );
     }
   }
   call(path, args) {
     try {
       let state = this.getState();
       if (path.length !== 1 || typeof path[0] !== "string") {
-        throw new Error("WritableStream stub only supports direct method calls");
+        throw new Error(
+          "WritableStream stub only supports direct method calls"
+        );
       }
       const method = path[0];
       if (method !== "write" && method !== "close" && method !== "abort") {
@@ -3007,7 +3189,9 @@ var WritableStreamStubHook = class _WritableStreamStubHook extends StubHook {
       }
       let func = state.writer[method];
       let promise = args.deliverCall(func, state.writer);
-      return new PromiseStubHook(promise.then((payload) => new PayloadStubHook(payload)));
+      return new PromiseStubHook(
+        promise.then((payload) => new PayloadStubHook(payload))
+      );
     } catch (err) {
       return new ErrorStubHook(err);
     }
@@ -3019,7 +3203,9 @@ var WritableStreamStubHook = class _WritableStreamStubHook extends StubHook {
     return new ErrorStubHook(new Error("Cannot use map() on a WritableStream"));
   }
   get(path) {
-    return new ErrorStubHook(new Error("Cannot access properties on a WritableStream stub"));
+    return new ErrorStubHook(
+      new Error("Cannot access properties on a WritableStream stub")
+    );
   }
   dup() {
     let state = this.getState();
@@ -3028,23 +3214,26 @@ var WritableStreamStubHook = class _WritableStreamStubHook extends StubHook {
   pull() {
     return Promise.reject(new Error("Cannot pull a WritableStream stub"));
   }
-  ignoreUnhandledRejections() {
-  }
+  ignoreUnhandledRejections() {}
   dispose() {
     let state = this.state;
     this.state = void 0;
     if (state) {
       if (--state.refcount === 0) {
         if (!state.closed) {
-          state.writer.abort(new Error("WritableStream RPC stub was disposed without calling close()")).catch(() => {
-          });
+          state.writer
+            .abort(
+              new Error(
+                "WritableStream RPC stub was disposed without calling close()"
+              )
+            )
+            .catch(() => {});
         }
         state.writer.releaseLock();
       }
     }
   }
-  onBroken(callback) {
-  }
+  onBroken(callback) {}
 };
 var INITIAL_WINDOW = 256 * 1024;
 var MAX_WINDOW = 1024 * 1024 * 1024;
@@ -3126,7 +3315,9 @@ var FlowController = class {
       let interval = ackTime - baseTime;
       let bytes = this.delivered - baseDelivered;
       let bandwidth = bytes / interval;
-      let growthFactor = this.inStartupPhase ? STARTUP_GROWTH_FACTOR : STEADY_GROWTH_FACTOR;
+      let growthFactor = this.inStartupPhase
+        ? STARTUP_GROWTH_FACTOR
+        : STEADY_GROWTH_FACTOR;
       let newWindow = bandwidth * this.minRtt * growthFactor;
       newWindow = Math.min(newWindow, token.windowAtSend * growthFactor);
       if (token.windowFullAtSend) {
@@ -3178,26 +3369,29 @@ function createWritableStreamFromHook(hook) {
         });
       } else {
         let { token, shouldBlock } = fc.onSend(size);
-        promise.then(() => {
-          let hasCapacity = fc.onAck(token);
-          if (hasCapacity && windowResolve) {
-            windowResolve();
-            windowResolve = void 0;
-            windowReject = void 0;
+        promise.then(
+          () => {
+            let hasCapacity = fc.onAck(token);
+            if (hasCapacity && windowResolve) {
+              windowResolve();
+              windowResolve = void 0;
+              windowReject = void 0;
+            }
+          },
+          (err) => {
+            fc.onError(token);
+            if (pendingError === void 0) {
+              pendingError = err;
+              controller.error(err);
+              disposeHook();
+            }
+            if (windowReject) {
+              windowReject(err);
+              windowResolve = void 0;
+              windowReject = void 0;
+            }
           }
-        }, (err) => {
-          fc.onError(token);
-          if (pendingError === void 0) {
-            pendingError = err;
-            controller.error(err);
-            disposeHook();
-          }
-          if (windowReject) {
-            windowReject(err);
-            windowResolve = void 0;
-            windowReject = void 0;
-          }
-        });
+        );
         if (shouldBlock) {
           return new Promise((resolve, reject) => {
             windowResolve = resolve;
@@ -3230,8 +3424,14 @@ function createWritableStreamFromHook(hook) {
         windowResolve = void 0;
         windowReject = void 0;
       }
-      const { promise } = hook.stream(["abort"], RpcPayload.fromAppParams([reason]));
-      promise.then(() => disposeHook(), () => disposeHook());
+      const { promise } = hook.stream(
+        ["abort"],
+        RpcPayload.fromAppParams([reason])
+      );
+      promise.then(
+        () => disposeHook(),
+        () => disposeHook()
+      );
     }
   });
 }
@@ -3244,7 +3444,11 @@ var ReadableStreamStubHook = class _ReadableStreamStubHook extends StubHook {
   // undefined when disposed
   // Creates a new ReadableStreamStubHook.
   static create(stream) {
-    return new _ReadableStreamStubHook({ refcount: 1, stream, canceled: false });
+    return new _ReadableStreamStubHook({
+      refcount: 1,
+      stream,
+      canceled: false
+    });
   }
   constructor(state, dupFrom) {
     super();
@@ -3255,7 +3459,9 @@ var ReadableStreamStubHook = class _ReadableStreamStubHook extends StubHook {
   }
   call(path, args) {
     args.dispose();
-    return new ErrorStubHook(new Error("Cannot call methods on a ReadableStream stub"));
+    return new ErrorStubHook(
+      new Error("Cannot call methods on a ReadableStream stub")
+    );
   }
   map(path, captures, instructions) {
     for (let cap of captures) {
@@ -3264,20 +3470,23 @@ var ReadableStreamStubHook = class _ReadableStreamStubHook extends StubHook {
     return new ErrorStubHook(new Error("Cannot use map() on a ReadableStream"));
   }
   get(path) {
-    return new ErrorStubHook(new Error("Cannot access properties on a ReadableStream stub"));
+    return new ErrorStubHook(
+      new Error("Cannot access properties on a ReadableStream stub")
+    );
   }
   dup() {
     let state = this.state;
     if (!state) {
-      throw new Error("Attempted to dup a ReadableStreamStubHook after it was disposed.");
+      throw new Error(
+        "Attempted to dup a ReadableStreamStubHook after it was disposed."
+      );
     }
     return new _ReadableStreamStubHook(state, this);
   }
   pull() {
     return Promise.reject(new Error("Cannot pull a ReadableStream stub"));
   }
-  ignoreUnhandledRejections() {
-  }
+  ignoreUnhandledRejections() {}
   dispose() {
     let state = this.state;
     this.state = void 0;
@@ -3286,17 +3495,19 @@ var ReadableStreamStubHook = class _ReadableStreamStubHook extends StubHook {
         if (!state.canceled) {
           state.canceled = true;
           if (!state.stream.locked) {
-            state.stream.cancel(
-              new Error("ReadableStream RPC stub was disposed without being consumed")
-            ).catch(() => {
-            });
+            state.stream
+              .cancel(
+                new Error(
+                  "ReadableStream RPC stub was disposed without being consumed"
+                )
+              )
+              .catch(() => {});
           }
         }
       }
     }
   }
-  onBroken(callback) {
-  }
+  onBroken(callback) {}
 };
 streamImpl.createWritableStreamHook = WritableStreamStubHook.create;
 streamImpl.createWritableStreamFromHook = createWritableStreamFromHook;
@@ -3309,7 +3520,10 @@ async function newWorkersRpcResponse(request, localMain) {
   } else if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     return newWorkersWebSocketRpcResponse(request, localMain);
   } else {
-    return new Response("This endpoint only accepts POST or WebSocket requests.", { status: 400 });
+    return new Response(
+      "This endpoint only accepts POST or WebSocket requests.",
+      { status: 400 }
+    );
   }
 }
 __name(newWorkersRpcResponse, "newWorkersRpcResponse");
@@ -3416,21 +3630,23 @@ var ProxyServerWorker_default = {
 };
 
 // node_modules/@cloudflare/vite-plugin/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
-var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
-  try {
-    return await middlewareCtx.next(request, env);
-  } finally {
+var drainBody = /* @__PURE__ */ __name(
+  async (request, env, _ctx, middlewareCtx) => {
     try {
-      if (request.body !== null && !request.bodyUsed) {
-        const reader = request.body.getReader();
-        while (!(await reader.read()).done) {
+      return await middlewareCtx.next(request, env);
+    } finally {
+      try {
+        if (request.body !== null && !request.bodyUsed) {
+          const reader = request.body.getReader();
+          while (!(await reader.read()).done) {}
         }
+      } catch (e) {
+        console.error("Failed to drain the unused request body.", e);
       }
-    } catch (e) {
-      console.error("Failed to drain the unused request body.", e);
     }
-  }
-}, "drainBody");
+  },
+  "drainBody"
+);
 var middleware_ensure_req_body_drained_default = drainBody;
 
 // .wrangler/tmp/bundle-NfKY52/middleware-insertion-facade.js
@@ -3483,13 +3699,16 @@ var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   }
 };
 function wrapExportedHandler(worker) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
+  if (
+    __INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 ||
+    __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0
+  ) {
     return worker;
   }
   for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
     __facade_register__(middleware);
   }
-  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
+  const fetchDispatcher = /* @__PURE__ */ __name(function (request, env, ctx) {
     if (worker.fetch === void 0) {
       throw new Error("Handler does not export a fetch() function.");
     }
@@ -3498,13 +3717,12 @@ function wrapExportedHandler(worker) {
   return {
     ...worker,
     fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
+      const dispatcher = /* @__PURE__ */ __name(function (type, init) {
         if (type === "scheduled" && worker.scheduled !== void 0) {
           const controller = new __Facade_ScheduledController__(
             Date.now(),
             init.cron ?? "",
-            () => {
-            }
+            () => {}
           );
           return worker.scheduled(controller, env, ctx);
         }
@@ -3515,7 +3733,10 @@ function wrapExportedHandler(worker) {
 }
 __name(wrapExportedHandler, "wrapExportedHandler");
 function wrapWorkerEntrypoint(klass) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
+  if (
+    __INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 ||
+    __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0
+  ) {
     return klass;
   }
   for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
@@ -3535,8 +3756,7 @@ function wrapWorkerEntrypoint(klass) {
         const controller = new __Facade_ScheduledController__(
           Date.now(),
           init.cron ?? "",
-          () => {
-          }
+          () => {}
         );
         return super.scheduled(controller);
       }
