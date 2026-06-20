@@ -35571,38 +35571,32 @@ function _stringbool(Classes, _params) {
     type: "pipe",
     in: stringSchema,
     out: booleanSchema,
-    transform: /* @__PURE__ */ __name(
-      (input, payload) => {
-        let data = input;
-        if (params.case !== "sensitive") data = data.toLowerCase();
-        if (truthySet.has(data)) {
-          return true;
-        } else if (falsySet.has(data)) {
-          return false;
-        } else {
-          payload.issues.push({
-            code: "invalid_value",
-            expected: "stringbool",
-            values: [...truthySet, ...falsySet],
-            input: payload.value,
-            inst: codec2,
-            continue: false
-          });
-          return {};
-        }
-      },
-      "transform"
-    ),
-    reverseTransform: /* @__PURE__ */ __name(
-      (input, _payload) => {
-        if (input === true) {
-          return truthyArray[0] || "true";
-        } else {
-          return falsyArray[0] || "false";
-        }
-      },
-      "reverseTransform"
-    ),
+    transform: /* @__PURE__ */ __name((input, payload) => {
+      let data = input;
+      if (params.case !== "sensitive") data = data.toLowerCase();
+      if (truthySet.has(data)) {
+        return true;
+      } else if (falsySet.has(data)) {
+        return false;
+      } else {
+        payload.issues.push({
+          code: "invalid_value",
+          expected: "stringbool",
+          values: [...truthySet, ...falsySet],
+          input: payload.value,
+          inst: codec2,
+          continue: false
+        });
+        return {};
+      }
+    }, "transform"),
+    reverseTransform: /* @__PURE__ */ __name((input, _payload) => {
+      if (input === true) {
+        return truthyArray[0] || "true";
+      } else {
+        return falsyArray[0] || "false";
+      }
+    }, "reverseTransform"),
     error: params.error
   });
   return codec2;

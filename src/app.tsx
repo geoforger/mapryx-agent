@@ -279,51 +279,51 @@ function SessionSidebar({
             return (
               <div
                 key={s.id}
-              role="button"
-              tabIndex={0}
-              className={`group flex items-center gap-1 px-2 py-1.5 mx-1 rounded-lg cursor-pointer ${s.id === activeId ? "bg-kumo-control" : "hover:bg-kumo-elevated"}`}
-              onClick={() => onSelect(s.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelect(s.id);
-                }
-              }}
-            >
-              <ChatCircleDotsIcon
-                size={13}
-                className={
-                  s.id === activeId
-                    ? "text-kumo-accent shrink-0"
-                    : "text-kumo-inactive shrink-0"
-                }
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-kumo-default truncate">
-                  {s.name}
+                role="button"
+                tabIndex={0}
+                className={`group flex items-center gap-1 px-2 py-1.5 mx-1 rounded-lg cursor-pointer ${s.id === activeId ? "bg-kumo-control" : "hover:bg-kumo-elevated"}`}
+                onClick={() => onSelect(s.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelect(s.id);
+                  }
+                }}
+              >
+                <ChatCircleDotsIcon
+                  size={13}
+                  className={
+                    s.id === activeId
+                      ? "text-kumo-accent shrink-0"
+                      : "text-kumo-inactive shrink-0"
+                  }
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-kumo-default truncate">
+                    {s.name}
+                  </div>
+                  <div className="text-[10px] text-kumo-inactive">
+                    {new Date(s.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                  </div>
                 </div>
-                <div className="text-[10px] text-kumo-inactive">
-                  {new Date(s.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  })}
-                </div>
+                {sessions.length > 1 && (
+                  <button
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-kumo-inactive hover:text-kumo-danger transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(s.id);
+                    }}
+                    aria-label="Delete session"
+                  >
+                    <TrashIcon size={11} />
+                  </button>
+                )}
               </div>
-              {sessions.length > 1 && (
-                <button
-                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-kumo-inactive hover:text-kumo-danger transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(s.id);
-                  }}
-                  aria-label="Delete session"
-                >
-                  <TrashIcon size={11} />
-                </button>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
       <div className="px-3 py-2 border-t border-kumo-line">
         <Text size="xs" variant="secondary">
