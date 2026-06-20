@@ -20,6 +20,49 @@ import { jwtVerify, type JWTPayload } from "jose";
 import { z } from "zod";
 import { CreditService } from "./credits";
 
+// ---------------------------------------------------------------------------
+// Token estimation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Rough token estimate: ~4 characters per token (GPT/Claude heuristic).
+ * Good enough for logging; replace with a real tiktoken call if precision matters.
+ */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/** Serialise any value to a string for token estimation. */
+function stringify(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value) ?? "";
+  } catch {
+    return String(value);
+  }
+}
+
+/** Estimate tokens for an array of model messages (role + content). */
+function estimateMessagesTokens(messages: ModelMessage[]): number {
+  return messages.reduce((total, msg) => {
+    const roleTokens = estimateTokens(msg.role);
+    const contentTokens =
+      typeof msg.content === "string"
+        ? estimateTokens(msg.content)
+        : Array.isArray(msg.content)
+          ? (msg.content as Array<{ type?: string; text?: string }>).reduce(
+              (sum, part) => sum + estimateTokens(stringify(part)),
+              0
+            )
+          : estimateTokens(stringify(msg.content));
+    return total + roleTokens + contentTokens;
+  }, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Data-URI inlining (existing)
+// ---------------------------------------------------------------------------
+
 /**
  * The AI SDK's downloadAssets step runs `new URL(data)` on every file
  * part's string data. Data URIs parse as valid URLs, so it tries to
@@ -170,6 +213,69 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
 
     const modelId = "@cf/zai-org/glm-4.7-flash";
 
+    // -----------------------------------------------------------------------
+    // TOKEN LOGGING — Step 1: raw client message
+    // -----------------------------------------------------------------------
+    const lastClientMessage = this.messages[this.messages.length - 1];
+    // UIMessage uses `parts` (not `content`) — serialise the whole message for logging
+    const rawClientText = lastClientMessage ? stringify((lastClientMessage as unknown as { parts?: unknown; content?: unknown }).parts ?? lastClientMessage) : "";
+    const clientTokensEst = estimateTokens(rawClientText);
+
+    console.log(
+      "\n╔══════════════════════════════════════════════════════════════╗"
+    );
+    console.log("║  [token-log] INCOMING CLIENT MESSAGE");
+    console.log(
+      "╚══════════════════════════════════════════════════════════════╝"
+    );
+    console.log(`[token-log] userId        : ${userId ?? "(anonymous)"}`);
+    console.log(`[token-log] agentRunId    : ${agentRunId ?? "(no credit run)"}`);
+    console.log(`[token-log] model         : ${modelId}`);
+    console.log(`[token-log] client msgs   : ${this.messages.length} stored message(s)`);
+    console.log(`[token-log] last role     : ${lastClientMessage?.role ?? "n/a"}`);
+    console.log(`[token-log] ~client tokens: ${clientTokensEst} (last message)`);
+    console.log("[token-log] FULL last message content:");
+    console.log(rawClientText);
+
+    // -----------------------------------------------------------------------
+    // TOKEN LOGGING — Step 2: build the final messages array (same as LLM call)
+    // -----------------------------------------------------------------------
+    const prunedMessages = pruneMessages({
+      messages: inlineDataUrls(await convertToModelMessages(this.messages)),
+      toolCalls: "before-last-2-messages"
+    });
+
+    const systemPromptTokensEst = estimateTokens(systemPrompt);
+    const historyTokensEst = estimateMessagesTokens(prunedMessages);
+    const totalInputTokensEst = systemPromptTokensEst + historyTokensEst;
+
+    console.log(
+      "\n╔══════════════════════════════════════════════════════════════╗"
+    );
+    console.log("║  [token-log] BACKEND ADDITIONS");
+    console.log(
+      "╚══════════════════════════════════════════════════════════════╝"
+    );
+    console.log(`[token-log] ~system prompt tokens : ${systemPromptTokensEst}`);
+    console.log(`[token-log] system prompt source  : ${body?.systemPrompt ? "client-injected" : "default fallback"}`);
+    console.log(`[token-log] history messages count: ${prunedMessages.length} (after pruning)`);
+    console.log(`[token-log] ~history tokens       : ${historyTokensEst}`);
+    console.log(
+      "\n╔══════════════════════════════════════════════════════════════╗"
+    );
+    console.log("║  [token-log] TOTAL TOKENS GOING TO LLM (estimated)");
+    console.log(
+      "╚══════════════════════════════════════════════════════════════╝"
+    );
+    console.log(`[token-log] ~system prompt tokens : ${systemPromptTokensEst}`);
+    console.log(`[token-log] ~history tokens       : ${historyTokensEst}`);
+    console.log(`[token-log] ─────────────────────────────────────────`);
+    console.log(`[token-log] ~TOTAL input tokens   : ${totalInputTokensEst}`);
+    console.log("[token-log] FULL system prompt:");
+    console.log(systemPrompt);
+    console.log("[token-log] FULL pruned messages going to LLM:");
+    console.log(JSON.stringify(prunedMessages, null, 2));
+
     let result;
     try {
       result = streamText({
@@ -177,11 +283,8 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
           sessionAffinity: this.sessionAffinity
         }),
         system: systemPrompt,
-        // Prune old tool calls to save tokens on long conversations
-        messages: pruneMessages({
-          messages: inlineDataUrls(await convertToModelMessages(this.messages)),
-          toolCalls: "before-last-2-messages"
-        }),
+        // Use the already-built prunedMessages (also logged above)
+        messages: prunedMessages,
         tools: {
           // MCP tools from connected servers
           ...mcpTools,
@@ -611,6 +714,29 @@ Most tools (DuckDB queries, layer management, spatial joins, buffer/clip/dissolv
       }
       throw error;
     }
+
+    // -----------------------------------------------------------------------
+    // TOKEN LOGGING — Step 3: actual LLM usage after streaming completes
+    // -----------------------------------------------------------------------
+    this.ctx.waitUntil(
+      // Wrap in Promise.resolve() because result.usage is PromiseLike (no .catch)
+      Promise.resolve(result.usage).then((usage) => {
+        console.log(
+          "\n╔══════════════════════════════════════════════════════════════╗"
+        );
+        console.log("║  [token-log] ACTUAL LLM TOKEN USAGE (reported by API)");
+        console.log(
+          "╚══════════════════════════════════════════════════════════════╝"
+        );
+        console.log(`[token-log] input tokens  (actual): ${usage.inputTokens ?? "n/a"}`);
+        console.log(`[token-log] output tokens (actual): ${usage.outputTokens ?? "n/a"}`);
+        console.log(`[token-log] total tokens  (actual): ${(usage.inputTokens ?? 0) + (usage.outputTokens ?? 0)}`);
+        console.log(`[token-log] userId        : ${userId ?? "(anonymous)"}`);
+        console.log(`[token-log] model         : ${modelId}`);
+      }).catch((err: unknown) => {
+        console.warn("[token-log] could not read usage:", err);
+      })
+    );
 
     if (creditService && userId && agentRunId) {
       const settle = async () => {
